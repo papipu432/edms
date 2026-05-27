@@ -32,6 +32,7 @@ dependencies = [
     "pytwain>=2.3.0",
     "sqlalchemy[asyncio]>=2.0.50",
     "tiktoken>=0.13.0",
+    "httpx>=0.28.1",
     "uvicorn[standard]>=0.48.0",
 ]
 

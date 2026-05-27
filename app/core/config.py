@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     LDAP_BIND_DN: str = ""
     LDAP_BIND_PASSWORD: str = ""
 
+    # LLM settings
+    LLM_PROVIDER: str = "openai"  # "openai" or "ollama"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL_SUMMARIZE: str = ""
+    OLLAMA_MODEL_KEYWORDS: str = ""
+    OLLAMA_MODEL_EMBEDDINGS: str = ""
+    OLLAMA_MODEL_CHAT: str = ""
+
     # Bootstrap admin
     BOOTSTRAP_ADMIN_USERNAME: str = "admin"
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"

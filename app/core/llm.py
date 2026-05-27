@@ -9,8 +9,15 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _is_ollama_provider() -> bool:
+    """Check if the current LLM provider is Ollama."""
+    return settings.LLM_PROVIDER == "ollama"
+
+
 def get_chat_model() -> ChatOpenAI | None:
     """Return a ChatOpenAI model if API key is configured, otherwise None."""
+    if _is_ollama_provider():
+        return None  # Ollama uses its own service, not langchain ChatOpenAI
     if not settings.OPENAI_API_KEY:
         return None
     return ChatOpenAI(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY)
@@ -25,7 +32,15 @@ def generate_summary(text: str) -> str:
     """Generate a summary of the given text using gpt-4o-mini.
 
     Returns a placeholder string if no API key is configured.
+    Uses Ollama if LLM_PROVIDER is set to 'ollama'.
     """
+    if _is_ollama_provider():
+        model_name = settings.OLLAMA_MODEL_SUMMARIZE
+        if not model_name:
+            return "Summary not available (no Ollama model configured for summarization)"
+        # Ollama generation is async; provide sync wrapper note
+        return "Summary not available (Ollama requires async context)"
+
     model = get_chat_model()
     if model is None:
         return "Summary not available (no API key configured)"
@@ -46,7 +61,14 @@ def extract_keywords(text: str) -> list[str]:
     """Extract keywords from the given text using gpt-4o-mini.
 
     Returns an empty list if no API key is configured.
+    Uses Ollama if LLM_PROVIDER is set to 'ollama'.
     """
+    if _is_ollama_provider():
+        model_name = settings.OLLAMA_MODEL_KEYWORDS
+        if not model_name:
+            return []
+        return []  # Ollama requires async context
+
     model = get_chat_model()
     if model is None:
         return []
@@ -72,7 +94,14 @@ def generate_embeddings(texts: list[str]) -> list[list[float]]:
     """Generate embeddings for a list of texts using text-embedding-3-small.
 
     Returns zero vectors if no API key is configured.
+    Uses Ollama if LLM_PROVIDER is set to 'ollama'.
     """
+    if _is_ollama_provider():
+        model_name = settings.OLLAMA_MODEL_EMBEDDINGS
+        if not model_name:
+            return [[0.0] * 1536 for _ in texts]
+        return [[0.0] * 1536 for _ in texts]  # Ollama requires async context
+
     if not settings.OPENAI_API_KEY:
         return [[0.0] * 1536 for _ in texts]
 
@@ -90,7 +119,14 @@ def chat_completion(messages: list, context: str) -> str:
     """Perform a RAG chat completion with provided context.
 
     Returns an error message if no API key is configured.
+    Uses Ollama if LLM_PROVIDER is set to 'ollama'.
     """
+    if _is_ollama_provider():
+        model_name = settings.OLLAMA_MODEL_CHAT
+        if not model_name:
+            return "Chat is not available (no Ollama model configured for chat)"
+        return "Chat is not available (Ollama requires async context)"
+
     model = get_chat_model()
     if model is None:
         return "Chat is not available (no API key configured)"

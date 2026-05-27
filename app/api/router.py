@@ -10,6 +10,7 @@ from app.api.pages import router as pages_router
 from app.api.rbac import router as rbac_router
 from app.api.scanner import router as scanner_router
 from app.api.search import router as search_router
+from app.api.settings_llm import router as settings_llm_router
 from app.api.users import router as users_router
 from app.api.wiki import router as wiki_router
 from app.api.workflow import router as workflow_router
@@ -28,3 +29,4 @@ api_router.include_router(pages_router)
 api_router.include_router(org_router)
 api_router.include_router(rbac_router)
 api_router.include_router(ldap_router)
+api_router.include_router(settings_llm_router)
