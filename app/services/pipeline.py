@@ -9,6 +9,7 @@ from app.core.llm import extract_keywords, generate_embeddings, generate_summary
 from app.models.document import Document, DocumentStatus
 from app.services.chunker import split_text
 from app.services.converter import ConversionService
+from app.services.prompt_guard import PromptGuard
 from app.services.storage import StorageService
 from app.services.vectordb import VectorDBService
 from app.services.wiki import WikiService
@@ -22,6 +23,7 @@ class PipelineService:
     def __init__(self, storage_service: StorageService | None = None) -> None:
         self.conversion = ConversionService()
         self.storage = storage_service or StorageService()
+        self._prompt_guard = PromptGuard()
 
     async def process_document(self, doc_id: int, db: AsyncSession) -> None:
         """Process a document: determine type, convert, and save outputs."""
@@ -110,8 +112,12 @@ class PipelineService:
 
             # Generate summary and keywords using LLM
             markdown_content = result.markdown_content
-            summary = generate_summary(markdown_content)
-            keywords = extract_keywords(markdown_content)
+
+            # Sanitize content before passing to LLM
+            sanitized_content, _ = self._prompt_guard.sanitize(markdown_content)
+
+            summary = generate_summary(sanitized_content)
+            keywords = extract_keywords(sanitized_content)
             document.summary = summary
             document.keywords = keywords
 
@@ -133,7 +139,7 @@ class PipelineService:
                 wiki.ingest(
                     doc_id=document.id,
                     title=document.original_filename,
-                    markdown_content=markdown_content,
+                    markdown_content=sanitized_content,
                     summary=summary,
                     keywords=keywords,
                     metadata={"group_id": document.group_id},

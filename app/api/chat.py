@@ -15,6 +15,7 @@ from app.schemas.chat import (
     ChatSessionResponse,
 )
 from app.services.chat import ChatService
+from app.services.prompt_injection import sanitize_for_llm
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,9 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ) -> ChatSendResponse:
     """Send a message in a chat session and get an AI response."""
+    # Sanitize the user message for prompt injection before passing to LLM
+    await sanitize_for_llm(request.message, source="chat_message", db=db)
+
     assistant_message, session = await chat_service.send_message(
         db=db,
         session_id=session_id,
