@@ -1,8 +1,7 @@
 import json
 import logging
 
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from app.core.config import settings
@@ -32,18 +31,12 @@ def generate_summary(text: str) -> str:
         return "Summary not available (no API key configured)"
 
     try:
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                "You are a helpful assistant that summarizes documents concisely.",
-            ),
-            (
-                "human",
-                "Please provide a concise summary of the following text:\n\n{text}",
-            ),
-        ])
-        chain = prompt | model | StrOutputParser()
-        return chain.invoke({"text": text[:4000]})
+        messages = [
+            SystemMessage(content="You are a helpful assistant that summarizes documents concisely."),
+            HumanMessage(content=f"Please provide a concise summary of the following text:\n\n{text[:4000]}"),
+        ]
+        result = model.invoke(messages)
+        return result.content or ""
     except Exception as e:
         logger.error("Failed to generate summary: %s", e)
         return "Summary not available (generation failed)"
@@ -59,19 +52,15 @@ def extract_keywords(text: str) -> list[str]:
         return []
 
     try:
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                "You are a helpful assistant that extracts keywords from documents. "
-                "Return keywords as a comma-separated list.",
+        messages = [
+            SystemMessage(
+                content="You are a helpful assistant that extracts keywords from documents. "
+                "Return keywords as a comma-separated list."
             ),
-            (
-                "human",
-                "Extract the main keywords from the following text:\n\n{text}",
-            ),
-        ])
-        chain = prompt | model | StrOutputParser()
-        content = chain.invoke({"text": text[:4000]})
+            HumanMessage(content=f"Extract the main keywords from the following text:\n\n{text[:4000]}"),
+        ]
+        result = model.invoke(messages)
+        content = result.content or ""
         keywords = [k.strip() for k in content.split(",") if k.strip()]
         return keywords
     except Exception as e:
@@ -102,8 +91,6 @@ def chat_completion(messages: list, context: str) -> str:
 
     Returns an error message if no API key is configured.
     """
-    from langchain_core.messages import HumanMessage, SystemMessage
-
     model = get_chat_model()
     if model is None:
         return "Chat is not available (no API key configured)"
@@ -133,7 +120,7 @@ def chat_completion(messages: list, context: str) -> str:
 
 
 def extract_entities_topics(text: str) -> dict:
-    """Use a LangChain chain to extract entities and topics as JSON.
+    """Use direct message objects to extract entities and topics as JSON.
 
     Returns a dict with 'entities' and 'topics' keys (lists of strings).
     """
@@ -142,23 +129,18 @@ def extract_entities_topics(text: str) -> dict:
         return {"entities": [], "topics": []}
 
     try:
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                "You extract structured information from text. Always return valid JSON.",
-            ),
-            (
-                "human",
-                "Extract key entities (people, organizations, technologies, places) "
+        messages = [
+            SystemMessage(content="You extract structured information from text. Always return valid JSON."),
+            HumanMessage(
+                content="Extract key entities (people, organizations, technologies, places) "
                 "and topics (concepts, themes, subjects) from the following text. "
                 "Return a JSON object with two keys: 'entities' (list of strings) "
                 "and 'topics' (list of strings). Return ONLY the JSON, no other text.\n\n"
-                "Text:\n{text}",
+                f"Text:\n{text[:4000]}"
             ),
-        ])
-        chain = prompt | model | StrOutputParser()
-        result_text = chain.invoke({"text": text[:4000]})
-        result_text = result_text.strip()
+        ]
+        result = model.invoke(messages)
+        result_text = (result.content or "").strip()
         if result_text.startswith("```"):
             lines = result_text.split("\n")
             result_text = "\n".join(lines[1:-1])
@@ -169,7 +151,7 @@ def extract_entities_topics(text: str) -> dict:
 
 
 def merge_content(existing: str, new_info: str) -> str:
-    """Use a LangChain chain to merge wiki content.
+    """Use direct message objects to merge wiki content.
 
     Returns merged content as a string.
     """
@@ -178,22 +160,18 @@ def merge_content(existing: str, new_info: str) -> str:
         return existing + "\n\n" + new_info
 
     try:
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                "You are a wiki editor that merges information cleanly.",
-            ),
-            (
-                "human",
-                "You are updating a wiki page. Merge the new information into the existing page content. "
+        messages = [
+            SystemMessage(content="You are a wiki editor that merges information cleanly."),
+            HumanMessage(
+                content="You are updating a wiki page. Merge the new information into the existing page content. "
                 "Keep the page well-organized and avoid duplicating information. "
                 "Return ONLY the updated markdown content.\n\n"
-                "Existing page:\n{existing}\n\n"
-                "New information to integrate:\n{new_info}",
+                f"Existing page:\n{existing}\n\n"
+                f"New information to integrate:\n{new_info}"
             ),
-        ])
-        chain = prompt | model | StrOutputParser()
-        return chain.invoke({"existing": existing, "new_info": new_info})
+        ]
+        result = model.invoke(messages)
+        return result.content or ""
     except Exception as e:
         logger.error("Failed to merge page content: %s", e)
         return existing + "\n\n" + new_info

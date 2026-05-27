@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.scanner import ScannerDevice, ScanRequest, ScanResponse
@@ -40,13 +38,10 @@ async def scan_document(request: ScanRequest):
             dpi=request.dpi,
             color_mode=request.color_mode,
         )
-        response = ScanResponse(
+        return ScanResponse(
             file_path=str(file_path),
             status="success",
             message="Document scanned successfully",
         )
-        # Clean up the temporary scan directory after building the response
-        scanner_service.cleanup_scan(Path(file_path))
-        return response
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

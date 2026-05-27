@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add Marker (Surya OCR) and Docling as document conversion engines in converter.py, and add OpenCV-based image preprocessing alongside existing Pillow in preprocessing.py. Keep existing pytesseract/PyMuPDF/python-docx as fallbacks.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add new dependencies to pyproject.toml via 'uv add': marker-pdf, docling, opencv-python-headless. Run 'uv sync' to verify they install.",
     "Enhance app/services/preprocessing.py: Add OpenCV-based methods alongside existing Pillow methods. Add methods: opencv_deskew (using Hough line transform to detect skew angle), opencv_adaptive_threshold (adaptive thresholding for binarization), opencv_morphological_denoise (morphological open/close operations). Modify preprocess_pipeline to accept an optional engine parameter ('pillow' or 'opencv', default 'pillow') and route to appropriate implementation. Keep the existing Pillow methods unchanged. Add a new opencv_pipeline method that chains: convert to grayscale, adaptive threshold, morphological denoise, deskew. Import cv2 and numpy; use PIL-to-numpy and numpy-to-PIL conversions.",
@@ -26,5 +26,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "marker-pdf and docling cannot be installed alongside pillow>=12 due to version conflicts. They are documented as optional dependencies and the code handles their absence gracefully via try/except imports. opencv-python-headless and numpy installed successfully. All 104 tests pass (82 existing + 22 new). Ruff lint clean."
 }

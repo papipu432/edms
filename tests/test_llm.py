@@ -59,39 +59,25 @@ class TestGenerateSummary:
             result = generate_summary("Some text to summarize")
             assert "not available" in result.lower() or "no api key" in result.lower()
 
-    def test_returns_summary_with_mocked_chain(self):
-        """Test summary generation with mocked LangChain chain."""
+    def test_returns_summary_with_mocked_model(self):
+        """Test summary generation with mocked model.invoke()."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_result = MagicMock()
+            mock_result.content = "This is a test summary."
+            mock_model.invoke.return_value = mock_result
             mock_get_model.return_value = mock_model
-            # Mock the chain invoke by mocking the pipe operator result
-            mock_chain = MagicMock()
-            mock_chain.invoke.return_value = "This is a test summary."
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(return_value=MagicMock())
-                mock_prompt.__or__.return_value.__or__ = MagicMock(
-                    return_value=mock_chain
-                )
-                result = generate_summary("Some long text content to summarize.")
-                assert result == "This is a test summary."
+            result = generate_summary("Some long text content to summarize.")
+            assert result == "This is a test summary."
 
     def test_handles_exception_gracefully(self):
         """Test that exceptions are handled."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_model.invoke.side_effect = Exception("API error")
             mock_get_model.return_value = mock_model
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(side_effect=Exception("API error"))
-                result = generate_summary("Some text")
-                assert "not available" in result.lower() or "failed" in result.lower()
+            result = generate_summary("Some text")
+            assert "not available" in result.lower() or "failed" in result.lower()
 
 
 class TestExtractKeywords:
@@ -102,38 +88,25 @@ class TestExtractKeywords:
             result = extract_keywords("Some text with keywords")
             assert result == []
 
-    def test_returns_keywords_with_mocked_chain(self):
-        """Test keyword extraction with mocked LangChain chain."""
+    def test_returns_keywords_with_mocked_model(self):
+        """Test keyword extraction with mocked model.invoke()."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_result = MagicMock()
+            mock_result.content = "python, fastapi, testing"
+            mock_model.invoke.return_value = mock_result
             mock_get_model.return_value = mock_model
-            mock_chain = MagicMock()
-            mock_chain.invoke.return_value = "python, fastapi, testing"
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(return_value=MagicMock())
-                mock_prompt.__or__.return_value.__or__ = MagicMock(
-                    return_value=mock_chain
-                )
-                result = extract_keywords("Text about python and fastapi testing.")
-                assert result == ["python", "fastapi", "testing"]
+            result = extract_keywords("Text about python and fastapi testing.")
+            assert result == ["python", "fastapi", "testing"]
 
     def test_handles_exception_gracefully(self):
         """Test that exceptions are handled."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_model.invoke.side_effect = Exception("API error")
             mock_get_model.return_value = mock_model
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(side_effect=Exception("API error"))
-                result = extract_keywords("Some text")
-                assert result == []
+            result = extract_keywords("Some text")
+            assert result == []
 
 
 class TestGenerateEmbeddings:
@@ -224,48 +197,30 @@ class TestExtractEntitiesTopics:
             result = extract_entities_topics("Some text with entities")
             assert result == {"entities": [], "topics": []}
 
-    def test_returns_entities_and_topics_with_mocked_chain(self):
-        """Test entity/topic extraction with mocked chain."""
+    def test_returns_entities_and_topics_with_mocked_model(self):
+        """Test entity/topic extraction with mocked model.invoke()."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_result = MagicMock()
+            mock_result.content = '{"entities": ["Python", "FastAPI"], "topics": ["Web Development"]}'
+            mock_model.invoke.return_value = mock_result
             mock_get_model.return_value = mock_model
-            mock_chain = MagicMock()
-            mock_chain.invoke.return_value = (
-                '{"entities": ["Python", "FastAPI"], "topics": ["Web Development"]}'
-            )
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(return_value=MagicMock())
-                mock_prompt.__or__.return_value.__or__ = MagicMock(
-                    return_value=mock_chain
-                )
-                result = extract_entities_topics("Python and FastAPI for web dev.")
-                assert result == {
-                    "entities": ["Python", "FastAPI"],
-                    "topics": ["Web Development"],
-                }
+            result = extract_entities_topics("Python and FastAPI for web dev.")
+            assert result == {
+                "entities": ["Python", "FastAPI"],
+                "topics": ["Web Development"],
+            }
 
     def test_handles_invalid_json_gracefully(self):
         """Test graceful handling of invalid JSON response."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_result = MagicMock()
+            mock_result.content = "not valid json"
+            mock_model.invoke.return_value = mock_result
             mock_get_model.return_value = mock_model
-            mock_chain = MagicMock()
-            mock_chain.invoke.return_value = "not valid json"
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(return_value=MagicMock())
-                mock_prompt.__or__.return_value.__or__ = MagicMock(
-                    return_value=mock_chain
-                )
-                result = extract_entities_topics("Some text")
-                assert result == {"entities": [], "topics": []}
+            result = extract_entities_topics("Some text")
+            assert result == {"entities": [], "topics": []}
 
 
 class TestMergeContent:
@@ -277,36 +232,23 @@ class TestMergeContent:
             assert "existing content" in result
             assert "new info" in result
 
-    def test_returns_merged_content_with_mocked_chain(self):
-        """Test content merging with mocked chain."""
+    def test_returns_merged_content_with_mocked_model(self):
+        """Test content merging with mocked model.invoke()."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_result = MagicMock()
+            mock_result.content = "# Merged\n\nCombined content here."
+            mock_model.invoke.return_value = mock_result
             mock_get_model.return_value = mock_model
-            mock_chain = MagicMock()
-            mock_chain.invoke.return_value = "# Merged\n\nCombined content here."
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(return_value=MagicMock())
-                mock_prompt.__or__.return_value.__or__ = MagicMock(
-                    return_value=mock_chain
-                )
-                result = merge_content("existing", "new info")
-                assert result == "# Merged\n\nCombined content here."
+            result = merge_content("existing", "new info")
+            assert result == "# Merged\n\nCombined content here."
 
     def test_handles_exception_gracefully(self):
         """Test graceful handling of exceptions."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_model.invoke.side_effect = Exception("API error")
             mock_get_model.return_value = mock_model
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(side_effect=Exception("API error"))
-                result = merge_content("existing content", "new info")
-                assert "existing content" in result
-                assert "new info" in result
+            result = merge_content("existing content", "new info")
+            assert "existing content" in result
+            assert "new info" in result

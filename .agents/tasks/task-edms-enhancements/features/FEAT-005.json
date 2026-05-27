@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-005",
+  "type": "fix",
+  "description": "Fix template injection in remaining LLM functions (generate_summary, extract_keywords, extract_entities_topics, merge_content) and fix scanner endpoint returning path to deleted file.",
+  "status": "in_progress",
+  "steps": [
+    "Replace ChatPromptTemplate pattern in generate_summary, extract_keywords, extract_entities_topics, and merge_content with direct SystemMessage/HumanMessage objects to avoid template injection from curly braces in document content.",
+    "Remove cleanup_scan() call from scan_document endpoint in app/api/scanner.py so the returned file_path points to an existing file.",
+    "Update tests in test_llm.py to mock model.invoke() directly instead of the ChatPromptTemplate chain pattern.",
+    "Remove ChatPromptTemplate and StrOutputParser imports from llm.py if no longer used.",
+    "Verify all tests pass and ruff lint is clean."
+  ],
+  "acceptance_criteria": [
+    "LLM functions use direct Message objects instead of ChatPromptTemplate",
+    "Scanner endpoint does not delete the scanned file before returning the response",
+    "All 170 tests pass",
+    "Ruff lint passes"
+  ],
+  "verification": [
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
