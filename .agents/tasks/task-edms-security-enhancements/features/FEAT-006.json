@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-006",
+  "type": "feat",
+  "description": "Add hardened Docker Compose configuration for ChromaDB with authentication, security options (read-only filesystem, no-new-privileges), and localhost-only binding. Also update the main docker-compose.yml if it exists.",
+  "status": "pending",
+  "steps": [
+    "Step 1 - Create docker-compose.chroma.yml with the hardened ChromaDB service: chromadb/chroma:latest image, container name chromadb-dms, port 127.0.0.1:8000:8000 (localhost only), volumes for chroma_data and chroma_config, environment variables for token auth provider and persistence, security_opt no-new-privileges, read_only true, tmpfs /tmp:size=100M,mode=1777.",
+    "Step 2 - Create a chroma_config/ directory with a placeholder token.txt file (with a generated random token) and a README explaining how to set the auth token.",
+    "Step 3 - Update app/core/config.py to add CHROMA_AUTH_TOKEN setting (used to authenticate with ChromaDB when token auth is enabled).",
+    "Step 4 - Update app/services/vectordb.py (if it exists) or create it to pass authentication credentials when connecting to ChromaDB (use the token from config).",
+    "Step 5 - Add a healthcheck to the docker-compose.chroma.yml service.",
+    "Step 6 - Add tests/test_docker_compose.py that validates the docker-compose.chroma.yml file is valid YAML and contains expected security configurations (parse YAML and assert on structure)."
+  ],
+  "acceptance_criteria": [
+    "docker-compose.chroma.yml exists with hardened ChromaDB configuration",
+    "ChromaDB binds to 127.0.0.1 only (not 0.0.0.0)",
+    "Token authentication is configured",
+    "read_only and no-new-privileges security options are set",
+    "tmpfs is configured for /tmp",
+    "chroma_config directory exists with token placeholder",
+    "ChromaDB client in app passes auth token when configured",
+    "YAML validation test passes"
+  ],
+  "verification": [
+    "uv run pytest tests/test_docker_compose.py -v",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

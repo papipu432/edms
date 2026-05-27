@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Restructure encrypted storage with envelope encryption (AES-256-GCM) and implement Shamir Secret Sharing for key recovery. Change storage layout to data/raw, data/md, data/csv, data/images, data/vectors, uploads/. All artifacts encrypted at rest with unique DEKs wrapped by KEK.",
+  "status": "pending",
+  "steps": [
+    "Step 1 - Add 'pycryptodome' and 'secretsharing' (or implement Shamir's scheme) to pyproject.toml. Actually use 'pycryptodome' for AES-256-GCM and implement Shamir SSS manually (it's simple polynomial interpolation over GF(256) or use the 'shamir-mnemonic' package if available, otherwise implement a minimal version).",
+    "Step 2 - Create app/services/encryption.py with: (a) EnvelopeEncryption class - generate_dek() returns 32-byte random key, encrypt_dek(dek, kek) wraps DEK with KEK using AES-256-GCM, decrypt_dek(wrapped_dek, kek) unwraps, encrypt_file(plaintext_path, output_path, kek) encrypts file with unique DEK and stores wrapped DEK in file header, decrypt_file(encrypted_path, output_path, kek) decrypts. (b) File format: [4-byte magic][4-byte version][12-byte nonce][16-byte tag][32-byte wrapped_dek_nonce][16-byte wrapped_dek_tag][32-byte wrapped_dek][...ciphertext]. (c) dek_zeroize(dek_bytes) - overwrite memory with zeros after use.",
+    "Step 3 - Create app/services/key_recovery.py with: (a) ShamirSecretSharing class - split_secret(secret: bytes, threshold: int, num_shares: int) returns list of share tuples, reconstruct_secret(shares: list) returns original secret. Implement using polynomial evaluation over GF(256). (b) KeyRecoveryManager - generate_kek() creates master KEK, split_kek(kek, threshold=2, shares=3) splits KEK into shares, recover_kek(shares) reconstructs KEK from threshold shares, export_share(share, path) saves share securely, import_share(path) loads share.",
+    "Step 4 - Create app/models/encryption.py with: EncryptionKey (id, key_type [kek|dek], key_id_hex, created_at, is_active, metadata_json), KeyShare (id, share_index, share_holder, created_at, is_distributed).",
+    "Step 5 - Refactor app/services/storage.py to use the new directory layout: data/raw/ (encrypted originals), data/md/ (encrypted markdown), data/csv/ (encrypted tables), data/images/ (encrypted images), data/vectors/ (ChromaDB - not encrypted, it handles its own storage), uploads/ (temporary, unencrypted waiting area). The StorageService should now encrypt files using EnvelopeEncryption when saving to data/ subdirs and decrypt when reading.",
+    "Step 6 - Update app/services/pipeline.py to use the new storage paths. After conversion, store markdown in data/md/, extracted images in data/images/, tables in data/csv/. Original uploaded files move from uploads/ to data/raw/ after processing.",
+    "Step 7 - Create app/api/settings_encryption.py router with: GET /settings/encryption (HTML page), GET /api/settings/encryption/status (key status), POST /api/settings/encryption/init (initialize KEK + generate shares), POST /api/settings/encryption/recover (reconstruct KEK from shares input). Protect with require_role('admin').",
+    "Step 8 - Create app/templates/settings_encryption.html template showing: encryption status, KEK status (active/needs-init), share distribution status, recovery interface (input shares to reconstruct), key rotation interface.",
+    "Step 9 - Register the new router in app/api/router.py. Add models to __init__.py.",
+    "Step 10 - Update tests: modify tests/conftest.py storage fixture to use new layout, add tests/test_encryption.py covering envelope encryption (encrypt/decrypt roundtrip), Shamir SSS (split/reconstruct with various threshold combinations), storage service encryption integration."
+  ],
+  "acceptance_criteria": [
+    "EnvelopeEncryption class correctly encrypts/decrypts files with unique DEKs wrapped by KEK",
+    "AES-256-GCM is used for both DEK wrapping and file encryption",
+    "ShamirSecretSharing correctly splits and reconstructs secrets with 2-of-3 threshold",
+    "Storage layout uses data/raw, data/md, data/csv, data/images, data/vectors, uploads/",
+    "Files in data/ subdirectories are encrypted at rest",
+    "DEK is zeroized from memory after use",
+    "Key recovery page allows admin to reconstruct KEK from shares",
+    "Encryption status page shows current key state",
+    "All existing tests pass with updated storage paths",
+    "New encryption tests verify roundtrip correctness"
+  ],
+  "verification": [
+    "uv run pytest tests/test_encryption.py -v",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

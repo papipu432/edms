@@ -1,0 +1,43 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Integrate the full OrgRBAC system from /projects/sandbox/rbac-org into EDMS, replacing the current simple user/role model with UUID-based users, fine-grained resource:action permissions, org structure (units, positions, grades), LDAP support, session cookies, and audit trail. Adapt the rbac-org synchronous PostgreSQL-specific code to work with EDMS's async SQLAlchemy ORM pattern supporting both SQLite and PostgreSQL via DATABASE_URL.",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Replace app/models/user.py with the full OrgRBAC model set. Create new models adapted to async SQLAlchemy mapped_column pattern (no 'org' schema for SQLite compat, use String(36) for UUIDs instead of PostgreSQL UUID type). Models to create: User (UUID PK, display_name, is_ldap, ldap_dn), Role (UUID PK, code, name, is_system), Permission (UUID PK, resource, action), RolePermission, UserRole (with granted_by, expires_at), OrgUnitType, OrgUnit (tree with parent_id), OrgGrade, OrgPosition, OrgUserGrade, OrgUserAssignment, OrgChangeHistory, LdapConfig, LdapGroupRole, LdapSyncLog. Keep the existing FolderAssignment model for backward compat but update its user FK to UUID string.",
+    "Step 2 - Update app/core/config.py to add LDAP settings (LDAP_ENABLED, LDAP_SERVER, LDAP_PORT, LDAP_BASE_DN, LDAP_BIND_DN, LDAP_BIND_PASSWORD), BOOTSTRAP_ADMIN_USERNAME/PASSWORD/EMAIL, and any new settings needed.",
+    "Step 3 - Rewrite app/core/security.py to support both Bearer token (API) and session cookie (access_token cookie) auth patterns. Add require_auth, require_role(*roles), and require_permission(resource, action) dependency factories that work with async SQLAlchemy. Keep backward compat with get_current_user for API endpoints. The user dict/object returned from auth deps should include roles list and permissions list.",
+    "Step 4 - Create app/services/ldap_service.py adapted from /projects/sandbox/rbac-org/app/services/ldap_service.py but using async SQLAlchemy sessions. Functions: test_connection, run_sync, authenticate_ldap. Handle ldap3 import gracefully (optional dependency).",
+    "Step 5 - Create app/api/org.py router with CRUD for org units, positions, grades, user assignments, org chart, and change history. Adapt from /projects/sandbox/rbac-org/app/routers/org.py but use async SQLAlchemy ORM queries instead of raw SQL. Return HTML pages using Jinja2 templates.",
+    "Step 6 - Create app/api/rbac.py router with CRUD for roles and permissions. Adapt from /projects/sandbox/rbac-org/app/routers/rbac.py.",
+    "Step 7 - Create app/api/ldap.py router with LDAP config CRUD, test connection, sync, and group-role mapping. Adapt from /projects/sandbox/rbac-org/app/routers/ldap.py.",
+    "Step 8 - Update app/api/users.py to use the new user model with org structure info (assignments, grades). Update user list/detail/create/edit/delete to work with UUID PKs and new role system.",
+    "Step 9 - Update app/api/auth.py to support both API (Bearer token) and HTML form (session cookie) login. Add /login (GET form, POST handler), /logout, /profile pages. Keep /api/auth/* endpoints for API clients.",
+    "Step 10 - Create all Jinja2 HTML templates for the new pages: app/templates/org/ (dashboard.html, units.html, positions.html, grades.html, assignments.html, chart.html, history.html), app/templates/rbac/ (roles.html, permissions.html), app/templates/ldap/ (config.html), app/templates/users/ (list.html, form.html, detail.html), app/templates/auth/ (profile.html). Use the existing base.html pattern with Tailwind CSS + htmx.",
+    "Step 11 - Update app/main.py lifespan to seed the new roles, permissions, unit types, grades, and bootstrap admin using the async ORM (adapt from /projects/sandbox/rbac-org/app/init_db.py seed data).",
+    "Step 12 - Update app/api/router.py to include new routers (org, rbac, ldap).",
+    "Step 13 - Update app/models/__init__.py to export all new models.",
+    "Step 14 - Update app/api/documents.py and other existing endpoints to use require_permission('documents', 'read') etc. for access control on document operations.",
+    "Step 15 - Update existing tests in tests/test_auth.py and tests/test_rbac.py to work with the new model structure. Add new tests for RBAC permission checks, org structure CRUD, and the new auth flows. Update tests/conftest.py fixtures to seed the new role/permission structure.",
+    "Step 16 - Add 'ldap3' and 'pycryptodome' as optional dependencies in pyproject.toml."
+  ],
+  "acceptance_criteria": [
+    "All new OrgRBAC models (User, Role, Permission, RolePermission, UserRole, OrgUnitType, OrgUnit, OrgGrade, OrgPosition, OrgUserGrade, OrgUserAssignment, OrgChangeHistory, LdapConfig, LdapGroupRole, LdapSyncLog) are defined in app/models/",
+    "Auth supports both Bearer token (for API) and session cookie (for HTML pages)",
+    "require_role and require_permission dependency factories work correctly",
+    "Document endpoints require appropriate permissions",
+    "Org structure CRUD (units, positions, grades, assignments) works via HTML pages",
+    "RBAC management (roles, permissions) works via HTML pages",
+    "LDAP config page exists (functional when ldap3 is installed)",
+    "Bootstrap admin is created on startup with full admin role",
+    "All existing tests pass plus new tests for RBAC/org features",
+    "Running 'uv run pytest tests/ -v' passes all tests"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": "All 170 tests pass. Models use String(36) for UUID PKs (SQLite compatible). The old RoleName enum is preserved for backward compat but roles now use code-based strings. UserRole junction table replaces the old user_roles many-to-many table. The User.roles property returns Role objects, User.role_codes returns code strings, User.permissions returns resource:action strings. Auth supports both Bearer token and session cookie. Workflow and annotation models updated to use String(36) FK for user_id. The get_current_user dependency now also accepts a Request parameter to read session cookies."
+}

@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add HTML settings page for Local LLM (Ollama) configuration. Allows toggling between cloud LLM (OpenAI) and local LLM (Ollama), configuring endpoint URL, listing pulled models, pulling new models, and selecting models for different tasks (summarization, keywords, embeddings, chat/RAG).",
+  "status": "pending",
+  "steps": [
+    "Step 1 - Add LLM settings to app/core/config.py: LLM_PROVIDER (openai|ollama), OLLAMA_BASE_URL (default http://localhost:11434), OLLAMA_MODEL_SUMMARIZE, OLLAMA_MODEL_KEYWORDS, OLLAMA_MODEL_EMBEDDINGS, OLLAMA_MODEL_CHAT.",
+    "Step 2 - Create app/services/ollama.py service that wraps Ollama API calls: list_models (GET /api/tags), pull_model (POST /api/pull with streaming), get_model_status, generate_completion, generate_embeddings. Use httpx for async HTTP calls.",
+    "Step 3 - Create app/api/settings_llm.py router with endpoints: GET /settings/llm (HTML page), GET /api/settings/llm (JSON current config), POST /api/settings/llm (update config), GET /api/settings/llm/models (list models from Ollama), POST /api/settings/llm/pull (pull a model), GET /api/settings/llm/status (model status). Protect with require_permission('settings', 'manage').",
+    "Step 4 - Create app/templates/settings_llm.html template showing: provider toggle (OpenAI/Ollama), Ollama endpoint URL field, models table (name, size, modified, status), pull model form, model assignment dropdowns for each task (summarize, keywords, embeddings, chat). Use htmx for dynamic model list refresh and pull progress.",
+    "Step 5 - Update app/core/llm.py to support Ollama as an alternative LLM backend. Add a factory/dispatch pattern that routes to OpenAI or Ollama based on LLM_PROVIDER setting.",
+    "Step 6 - Register the new router in app/api/router.py.",
+    "Step 7 - Add navigation link to base.html for Settings > LLM.",
+    "Step 8 - Add tests in tests/test_settings_llm.py covering: settings page loads, config update endpoint, model list endpoint (mocked Ollama response)."
+  ],
+  "acceptance_criteria": [
+    "GET /settings/llm returns an HTML page with LLM configuration options",
+    "Can toggle between OpenAI and Ollama providers via the settings API",
+    "Ollama model list endpoint returns models when Ollama is available (graceful error when not)",
+    "Model pull endpoint initiates a pull request to Ollama API",
+    "Model assignments (summarize, keywords, embeddings, chat) are configurable",
+    "LLM service dispatches to correct backend based on provider setting",
+    "Tests pass for settings endpoints"
+  ],
+  "verification": [
+    "uv run pytest tests/test_settings_llm.py -v",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

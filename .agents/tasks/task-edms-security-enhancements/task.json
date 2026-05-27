@@ -1,0 +1,7 @@
+{
+  "task_id": "task-edms-security-enhancements",
+  "task_description": "Enhance EDMS with: (1) Full OrgRBAC system integration replacing simple RBAC, (2) Ollama/LLM settings page, (3) Backup management settings page, (4) Ransomware detection and monitoring, (5) Encrypted storage with envelope encryption and Shamir key recovery, (6) Hardened Docker Compose for ChromaDB.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006"],
+  "blocked_reason": null
+}
