@@ -38,6 +38,15 @@
             if (token) options.headers['Authorization'] = 'Bearer ' + token;
             return fetch(url, options);
         }
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
     </script>
     {% block scripts %}{% endblock %}
 </body>

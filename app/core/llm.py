@@ -102,6 +102,8 @@ def chat_completion(messages: list, context: str) -> str:
 
     Returns an error message if no API key is configured.
     """
+    from langchain_core.messages import HumanMessage, SystemMessage
+
     model = get_chat_model()
     if model is None:
         return "Chat is not available (no API key configured)"
@@ -112,20 +114,19 @@ def chat_completion(messages: list, context: str) -> str:
             "Use the context below to answer the user's question. If the answer is not in the "
             "context, say so.\n\nContext:\n" + context
         )
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "{system_content}"),
-            ("human", "{user_message}"),
-        ])
-        chain = prompt | model | StrOutputParser()
         # Extract user message from messages list
         user_message = ""
         for msg in messages:
             if msg.get("role") == "user":
                 user_message = msg.get("content", "")
-        return chain.invoke({
-            "system_content": system_content,
-            "user_message": user_message,
-        })
+        # Use message objects directly to avoid template injection from
+        # curly braces in context or user content
+        messages_list = [
+            SystemMessage(content=system_content),
+            HumanMessage(content=user_message),
+        ]
+        result = model.invoke(messages_list)
+        return result.content
     except Exception as e:
         logger.error("Failed to complete chat: %s", e)
         return "Chat completion failed due to an error."

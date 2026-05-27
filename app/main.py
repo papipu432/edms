@@ -54,6 +54,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "This is insecure for production deployments. "
             "Set a strong password via the PDF_ENCRYPTION_PASSWORD environment variable."
         )
+    if settings.SECRET_KEY == "changeme-secret-key-for-jwt":
+        logger.warning(
+            "SECRET_KEY is set to the default 'changeme-secret-key-for-jwt'. "
+            "This is insecure for production deployments. "
+            "Set a strong secret via the SECRET_KEY environment variable."
+        )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

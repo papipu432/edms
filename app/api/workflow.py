@@ -11,6 +11,14 @@ from app.schemas.workflow import WorkflowActionRequest, WorkflowEntryResponse
 
 router = APIRouter(tags=["workflow"])
 
+# Mapping of workflow actions to the roles permitted to perform them
+_ACTION_ALLOWED_ROLES: dict[WorkflowAction, list[str]] = {
+    WorkflowAction.submit_review: ["editor", "admin", "annotator"],
+    WorkflowAction.approve: ["approver", "admin"],
+    WorkflowAction.reject: ["reviewer", "admin"],
+    WorkflowAction.request_changes: ["reviewer", "admin"],
+}
+
 
 @router.post(
     "/api/documents/{document_id}/workflow/{action}",
@@ -24,6 +32,15 @@ async def create_workflow_action(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Check role permissions for the requested action
+    allowed_roles = _ACTION_ALLOWED_ROLES.get(action, [])
+    user_roles = [r.name.value for r in current_user.roles]
+    if not any(role in user_roles for role in allowed_roles):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions for action '{action.value}'",
+        )
+
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")

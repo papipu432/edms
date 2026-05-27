@@ -193,6 +193,7 @@ class ScannerService:
             self._backend = self._auto_detect_backend()
         else:
             self._backend = backend
+        self._temp_dirs: list[Path] = []
 
     @staticmethod
     def _auto_detect_backend() -> ScannerBackend | None:
@@ -221,10 +222,42 @@ class ScannerService:
             return []
 
     def scan(self, device_id: str, dpi: int = 300, color_mode: str = "color") -> Path:
-        """Scan a document and return path to the scanned image."""
+        """Scan a document and return path to the scanned image.
+
+        The caller is responsible for calling cleanup_scan() after the scanned
+        file has been consumed to remove the temporary directory.
+        """
         if self._backend is None:
             raise RuntimeError("No scanner backend available")
-        return self._backend.scan(device_id, dpi, color_mode)
+        result_path = self._backend.scan(device_id, dpi, color_mode)
+        # Track the parent temp directory for cleanup
+        self._temp_dirs.append(result_path.parent)
+        return result_path
+
+    def cleanup_scan(self, file_path: Path) -> None:
+        """Remove the temporary directory associated with a scanned file."""
+        import shutil
+
+        scan_dir = file_path.parent
+        try:
+            if scan_dir.exists():
+                shutil.rmtree(scan_dir)
+            if scan_dir in self._temp_dirs:
+                self._temp_dirs.remove(scan_dir)
+        except OSError as e:
+            logger.error("Failed to clean up scan directory %s: %s", scan_dir, e)
+
+    def cleanup_all(self) -> None:
+        """Remove all tracked temporary scan directories."""
+        import shutil
+
+        for scan_dir in list(self._temp_dirs):
+            try:
+                if scan_dir.exists():
+                    shutil.rmtree(scan_dir)
+            except OSError as e:
+                logger.error("Failed to clean up scan directory %s: %s", scan_dir, e)
+        self._temp_dirs.clear()
 
     def get_device_capabilities(self, device_id: str) -> dict:
         """Get capabilities of a specific device."""

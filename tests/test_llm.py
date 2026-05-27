@@ -190,43 +190,30 @@ class TestChatCompletion:
             assert "not available" in result.lower()
 
     def test_returns_answer_with_mocked_chain(self):
-        """Test chat completion with mocked LangChain chain."""
+        """Test chat completion with mocked LangChain model."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_result = MagicMock()
+            mock_result.content = "The answer is 42."
+            mock_model.invoke.return_value = mock_result
             mock_get_model.return_value = mock_model
-            mock_chain = MagicMock()
-            mock_chain.invoke.return_value = "The answer is 42."
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(return_value=MagicMock())
-                mock_prompt.__or__.return_value.__or__ = MagicMock(
-                    return_value=mock_chain
-                )
-                result = chat_completion(
-                    messages=[{"role": "user", "content": "What is the answer?"}],
-                    context="The answer to everything is 42.",
-                )
-                assert result == "The answer is 42."
+            result = chat_completion(
+                messages=[{"role": "user", "content": "What is the answer?"}],
+                context="The answer to everything is 42.",
+            )
+            assert result == "The answer is 42."
 
     def test_handles_exception_gracefully(self):
         """Test that exceptions are handled."""
         with patch("app.core.llm.get_chat_model") as mock_get_model:
             mock_model = MagicMock()
+            mock_model.invoke.side_effect = Exception("API error")
             mock_get_model.return_value = mock_model
-            with patch(
-                "app.core.llm.ChatPromptTemplate"
-            ) as mock_prompt_cls:
-                mock_prompt = MagicMock()
-                mock_prompt_cls.from_messages.return_value = mock_prompt
-                mock_prompt.__or__ = MagicMock(side_effect=Exception("API error"))
-                result = chat_completion(
-                    messages=[{"role": "user", "content": "Hello"}],
-                    context="context",
-                )
-                assert "failed" in result.lower() or "error" in result.lower()
+            result = chat_completion(
+                messages=[{"role": "user", "content": "Hello"}],
+                context="context",
+            )
+            assert "failed" in result.lower() or "error" in result.lower()
 
 
 class TestExtractEntitiesTopics:

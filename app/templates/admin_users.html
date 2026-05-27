@@ -56,13 +56,13 @@ async function loadUsers() {
     const tbody = document.getElementById('users-table');
     tbody.innerHTML = users.map(u => `
         <tr>
-            <td class="px-4 py-3 text-sm">${u.username}</td>
-            <td class="px-4 py-3 text-sm">${u.email}</td>
+            <td class="px-4 py-3 text-sm">${escapeHtml(u.username)}</td>
+            <td class="px-4 py-3 text-sm">${escapeHtml(u.email)}</td>
             <td class="px-4 py-3 text-sm">
-                ${u.roles.map(r => `<span class="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full mr-1">${r}</span>`).join('')}
+                ${u.roles.map(r => `<span class="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full mr-1">${escapeHtml(r)}</span>`).join('')}
                 <select onchange="assignRole(${u.id}, this.value); this.selectedIndex=0;" class="mt-1 text-xs border rounded px-1 py-0.5">
                     <option value="">+ Add role</option>
-                    ${allRoles.filter(r => !u.roles.includes(r)).map(r => `<option value="${r}">${r}</option>`).join('')}
+                    ${allRoles.filter(r => !u.roles.includes(r)).map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
                 </select>
             </td>
             <td class="px-4 py-3 text-sm">${u.is_active ? '<span class="text-green-600">Active</span>' : '<span class="text-red-600">Inactive</span>'}</td>

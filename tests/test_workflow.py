@@ -1,25 +1,48 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password
 from app.models.document import Document, DocumentStatus
 from app.models.group import Group
-from app.models.user import User
+from app.models.user import Role, RoleName, User
 
 
-async def _create_user_and_token(db: AsyncSession) -> tuple[User, str]:
-    """Helper to create a user and return (user, token)."""
+async def _create_user_with_roles(
+    db: AsyncSession, roles: list[RoleName] | None = None
+) -> tuple[User, str]:
+    """Helper to create a user with specified roles and return (user, token)."""
+    # Ensure role records exist
+    if roles:
+        for role_name in roles:
+            existing = await db.execute(select(Role).where(Role.name == role_name))
+            if existing.scalar_one_or_none() is None:
+                db.add(Role(name=role_name, description=f"{role_name.value} role"))
+        await db.flush()
+
     user = User(
         username="testuser",
         email="test@example.com",
         hashed_password=hash_password("password123"),
     )
+
+    if roles:
+        for role_name in roles:
+            result = await db.execute(select(Role).where(Role.name == role_name))
+            role = result.scalar_one()
+            user.roles.append(role)
+
     db.add(user)
     await db.flush()
     await db.refresh(user)
     token = create_access_token(data={"sub": user.username})
     return user, token
+
+
+async def _create_user_and_token(db: AsyncSession) -> tuple[User, str]:
+    """Helper to create a user with admin role and return (user, token)."""
+    return await _create_user_with_roles(db, [RoleName.admin])
 
 
 async def _create_document(db: AsyncSession) -> Document:
@@ -118,7 +141,7 @@ async def test_list_annotations_document_not_found(client: AsyncClient, db_sessi
 
 @pytest.mark.asyncio
 async def test_workflow_submit_review(client: AsyncClient, db_session: AsyncSession):
-    user, token = await _create_user_and_token(db_session)
+    user, token = await _create_user_with_roles(db_session, [RoleName.editor])
     doc = await _create_document(db_session)
 
     response = await client.post(
@@ -135,7 +158,7 @@ async def test_workflow_submit_review(client: AsyncClient, db_session: AsyncSess
 
 @pytest.mark.asyncio
 async def test_workflow_approve(client: AsyncClient, db_session: AsyncSession):
-    user, token = await _create_user_and_token(db_session)
+    user, token = await _create_user_with_roles(db_session, [RoleName.approver])
     doc = await _create_document(db_session)
 
     response = await client.post(
@@ -150,7 +173,7 @@ async def test_workflow_approve(client: AsyncClient, db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_workflow_reject(client: AsyncClient, db_session: AsyncSession):
-    user, token = await _create_user_and_token(db_session)
+    user, token = await _create_user_with_roles(db_session, [RoleName.reviewer])
     doc = await _create_document(db_session)
 
     response = await client.post(
@@ -166,7 +189,7 @@ async def test_workflow_reject(client: AsyncClient, db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_workflow_request_changes(client: AsyncClient, db_session: AsyncSession):
-    user, token = await _create_user_and_token(db_session)
+    user, token = await _create_user_with_roles(db_session, [RoleName.reviewer])
     doc = await _create_document(db_session)
 
     response = await client.post(
@@ -181,7 +204,7 @@ async def test_workflow_request_changes(client: AsyncClient, db_session: AsyncSe
 
 @pytest.mark.asyncio
 async def test_workflow_history(client: AsyncClient, db_session: AsyncSession):
-    user, token = await _create_user_and_token(db_session)
+    user, token = await _create_user_with_roles(db_session, [RoleName.admin])
     doc = await _create_document(db_session)
 
     # Perform multiple actions
@@ -218,7 +241,7 @@ async def test_workflow_requires_auth(client: AsyncClient, db_session: AsyncSess
 
 @pytest.mark.asyncio
 async def test_workflow_document_not_found(client: AsyncClient, db_session: AsyncSession):
-    user, token = await _create_user_and_token(db_session)
+    user, token = await _create_user_with_roles(db_session, [RoleName.admin])
 
     response = await client.post(
         "/api/documents/9999/workflow/approve",
@@ -232,3 +255,45 @@ async def test_workflow_document_not_found(client: AsyncClient, db_session: Asyn
 async def test_workflow_history_document_not_found(client: AsyncClient, db_session: AsyncSession):
     response = await client.get("/api/documents/9999/workflow")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_workflow_role_enforcement_approve(client: AsyncClient, db_session: AsyncSession):
+    """Test that users without the approver role cannot approve."""
+    user, token = await _create_user_with_roles(db_session, [RoleName.annotator])
+    doc = await _create_document(db_session)
+
+    response = await client.post(
+        f"/api/documents/{doc.id}/workflow/approve",
+        json={"comment": "Trying to approve"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_workflow_role_enforcement_reject(client: AsyncClient, db_session: AsyncSession):
+    """Test that users without the reviewer role cannot reject."""
+    user, token = await _create_user_with_roles(db_session, [RoleName.annotator])
+    doc = await _create_document(db_session)
+
+    response = await client.post(
+        f"/api/documents/{doc.id}/workflow/reject",
+        json={"comment": "Trying to reject"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_workflow_role_enforcement_allowed(client: AsyncClient, db_session: AsyncSession):
+    """Test that annotator can submit_review."""
+    user, token = await _create_user_with_roles(db_session, [RoleName.annotator])
+    doc = await _create_document(db_session)
+
+    response = await client.post(
+        f"/api/documents/{doc.id}/workflow/submit_review",
+        json={"comment": "Submitting"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201

@@ -59,7 +59,7 @@ async function loadDocument() {
         const mdResp = await authFetch(`/api/documents/${documentId}/markdown`);
         if (mdResp.ok) {
             const mdData = await mdResp.json();
-            document.getElementById('doc-content').innerHTML = `<pre class="whitespace-pre-wrap text-sm">${mdData.content || ''}</pre>`;
+            document.getElementById('doc-content').innerHTML = `<pre class="whitespace-pre-wrap text-sm">${escapeHtml(mdData.content || '')}</pre>`;
         }
     } else {
         document.getElementById('doc-content').innerHTML = '<p class="text-gray-500">No markdown content available</p>';
@@ -77,7 +77,7 @@ async function loadAnnotations() {
     }
     list.innerHTML = annotations.map(a => `
         <div class="border-l-4 border-blue-400 pl-3 py-1">
-            <p class="text-sm">${a.text}</p>
+            <p class="text-sm">${escapeHtml(a.text)}</p>
             <p class="text-xs text-gray-400 mt-1">${new Date(a.created_at).toLocaleString()}${a.start_offset != null ? ` [${a.start_offset}-${a.end_offset}]` : ''}</p>
         </div>
     `).join('');
