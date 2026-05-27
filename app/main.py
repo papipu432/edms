@@ -21,6 +21,7 @@ from app.models.user import (
     User,
     UserRole,
 )
+from app.setup_wizard.web import router as setup_wizard_router
 
 logger = logging.getLogger(__name__)
 
@@ -287,5 +288,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount setup wizard routes (active only when first-launch detected)
+app.include_router(setup_wizard_router)
 
 app.include_router(api_router)
