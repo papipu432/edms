@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Add Jinja2-rendered HTML frontend pages for document workflow: login, dashboard, document viewer with annotations, review/approval workflow, cross-referenced document viewing, and user/role management (admin).",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add dependency via 'uv add': jinja2. Run 'uv sync'.",
     "Create app/templates/ directory structure: app/templates/base.html (base template with nav, CSS via Tailwind CDN, common JS), app/templates/login.html, app/templates/dashboard.html, app/templates/document_viewer.html, app/templates/workflow.html, app/templates/crossref.html, app/templates/admin_users.html.",
@@ -41,5 +41,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Used Starlette 1.1.0 TemplateResponse API with request as first positional arg (not in context dict). All 167 tests pass (146 existing + 21 new). Jinja2 3.1.6 installed."
 }
