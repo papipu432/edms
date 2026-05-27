@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Backup Settings - EDMS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Backup Settings</h1>
+        <div id="backup-status-indicator" class="flex items-center space-x-2">
+            <span class="inline-block w-3 h-3 rounded-full bg-gray-400"></span>
+            <span class="text-sm text-gray-600">Checking...</span>
+        </div>
+    </div>
+
+    <!-- MinIO Primary Configuration -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">MinIO Primary Storage</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Endpoint</label>
+                <input type="text" id="minio-primary-endpoint" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" placeholder="minio.example.com:9000">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Bucket</label>
+                <input type="text" id="minio-primary-bucket" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" placeholder="edms-backup">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Access Key</label>
+                <input type="text" id="minio-primary-access-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Secret Key</label>
+                <input type="password" id="minio-primary-secret-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+            </div>
+        </div>
+        <div class="mt-4">
+            <button onclick="testMinioConnection('primary')" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Test Connection
+            </button>
+            <span id="minio-primary-status" class="ml-3 text-sm"></span>
+        </div>
+    </div>
+
+    <!-- MinIO DR Configuration -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">MinIO DR (Disaster Recovery) Storage</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Endpoint</label>
+                <input type="text" id="minio-dr-endpoint" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" placeholder="minio-dr.example.com:9000">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Bucket</label>
+                <input type="text" id="minio-dr-bucket" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" placeholder="edms-backup-dr">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Access Key</label>
+                <input type="text" id="minio-dr-access-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Secret Key</label>
+                <input type="password" id="minio-dr-secret-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+            </div>
+        </div>
+        <div class="mt-4">
+            <button onclick="testMinioConnection('dr')" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Test Connection
+            </button>
+            <span id="minio-dr-status" class="ml-3 text-sm"></span>
+        </div>
+    </div>
+
+    <!-- Restic Repository Settings -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Restic Repository</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Repository Path</label>
+                <input type="text" id="restic-repository" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" placeholder="s3:http://minio:9000/edms-backup">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Repository Password</label>
+                <input type="password" id="restic-password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Configuration -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Backup Schedule</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Cron Expression</label>
+                <input type="text" id="backup-schedule" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" placeholder="0 2 * * *">
+                <p class="mt-1 text-xs text-gray-500">Format: minute hour day month weekday (e.g., "0 2 * * *" = daily at 2:00 AM)</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Schedule Preview</label>
+                <p id="schedule-preview" class="mt-2 text-sm text-gray-600">Daily at 2:00 AM</p>
+            </div>
+        </div>
+        <div class="mt-4">
+            <button onclick="updateSchedule()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                Update Schedule
+            </button>
+        </div>
+    </div>
+
+    <!-- Retention Policy -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Retention Policy</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Retention Days</label>
+                <input type="number" id="backup-retention-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2" min="1" value="30">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Immutable Period</label>
+                <p class="mt-2 text-sm text-gray-600">Backups are immutable for the retention period</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Configuration -->
+    <div class="flex justify-end space-x-3">
+        <button onclick="saveConfig()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+            Save Configuration
+        </button>
+    </div>
+
+    <!-- Manual Backup -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Manual Backup</h2>
+        <div class="flex items-center space-x-4">
+            <button onclick="triggerBackup('primary')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
+                Run Backup (Primary)
+            </button>
+            <button onclick="triggerBackup('dr')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700">
+                Run Backup (DR)
+            </button>
+            <span id="backup-trigger-status" class="text-sm text-gray-600"></span>
+        </div>
+    </div>
+
+    <!-- Backup History -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Backup History</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Finished</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Files</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+                    </tr>
+                </thead>
+                <tbody id="backup-history-body" class="bg-white divide-y divide-gray-200">
+                    <tr><td colspan="7" class="px-4 py-3 text-sm text-gray-500 text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            <button onclick="loadHistory()" class="text-sm text-blue-600 hover:text-blue-800">Refresh</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadConfig() {
+        const resp = await authFetch('/api/settings/backup/config');
+        if (resp.ok) {
+            const data = await resp.json();
+            document.getElementById('minio-primary-endpoint').value = data.minio_primary_endpoint || '';
+            document.getElementById('minio-primary-bucket').value = data.minio_primary_bucket || '';
+            document.getElementById('minio-primary-access-key').value = data.minio_primary_access_key || '';
+            document.getElementById('minio-dr-endpoint').value = data.minio_dr_endpoint || '';
+            document.getElementById('minio-dr-bucket').value = data.minio_dr_bucket || '';
+            document.getElementById('minio-dr-access-key').value = data.minio_dr_access_key || '';
+            document.getElementById('restic-repository').value = data.restic_repository || '';
+            document.getElementById('backup-schedule').value = data.backup_schedule || '0 2 * * *';
+            document.getElementById('backup-retention-days').value = data.backup_retention_days || 30;
+        }
+    }
+
+    async function saveConfig() {
+        const config = {
+            minio_primary_endpoint: document.getElementById('minio-primary-endpoint').value,
+            minio_primary_access_key: document.getElementById('minio-primary-access-key').value,
+            minio_primary_secret_key: document.getElementById('minio-primary-secret-key').value || null,
+            minio_primary_bucket: document.getElementById('minio-primary-bucket').value,
+            minio_dr_endpoint: document.getElementById('minio-dr-endpoint').value,
+            minio_dr_access_key: document.getElementById('minio-dr-access-key').value,
+            minio_dr_secret_key: document.getElementById('minio-dr-secret-key').value || null,
+            minio_dr_bucket: document.getElementById('minio-dr-bucket').value,
+            restic_repository: document.getElementById('restic-repository').value,
+            restic_password: document.getElementById('restic-password').value || null,
+            backup_retention_days: parseInt(document.getElementById('backup-retention-days').value) || 30,
+        };
+        // Remove null values
+        Object.keys(config).forEach(k => { if (config[k] === null || config[k] === '') delete config[k]; });
+        const resp = await authFetch('/api/settings/backup/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        if (resp.ok) {
+            alert('Configuration saved');
+        }
+    }
+
+    async function loadHistory() {
+        const resp = await authFetch('/api/settings/backup/history');
+        const tbody = document.getElementById('backup-history-body');
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-3 text-sm text-gray-500 text-center">No backup history</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.jobs.map(job => `
+                <tr>
+                    <td class="px-4 py-3 text-sm">${escapeHtml(job.job_type)}</td>
+                    <td class="px-4 py-3 text-sm">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${job.status === 'completed' ? 'bg-green-100 text-green-800' : job.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">${escapeHtml(job.status)}</span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">${job.started_at || '-'}</td>
+                    <td class="px-4 py-3 text-sm">${job.finished_at || '-'}</td>
+                    <td class="px-4 py-3 text-sm">${job.size_bytes ? (job.size_bytes / 1024 / 1024).toFixed(2) + ' MB' : '-'}</td>
+                    <td class="px-4 py-3 text-sm">${job.files_count || '-'}</td>
+                    <td class="px-4 py-3 text-sm">${escapeHtml(job.target)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    async function triggerBackup(target) {
+        const statusEl = document.getElementById('backup-trigger-status');
+        statusEl.textContent = 'Starting backup...';
+        const resp = await authFetch('/api/settings/backup/run', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({target: target})
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            statusEl.textContent = 'Backup started (Job: ' + data.job_id + ')';
+            setTimeout(loadHistory, 2000);
+        } else {
+            statusEl.textContent = 'Failed to start backup';
+        }
+    }
+
+    async function testMinioConnection(type) {
+        const statusEl = document.getElementById(`minio-${type}-status`);
+        statusEl.textContent = 'Testing...';
+        statusEl.className = 'ml-3 text-sm text-gray-600';
+
+        const resp = await authFetch('/api/settings/backup/status');
+        if (resp.ok) {
+            const data = await resp.json();
+            const configured = type === 'primary' ? data.primary_endpoint_configured : data.dr_endpoint_configured;
+            if (configured) {
+                statusEl.textContent = 'Endpoint configured';
+                statusEl.className = 'ml-3 text-sm text-green-600';
+            } else {
+                statusEl.textContent = 'Not configured';
+                statusEl.className = 'ml-3 text-sm text-red-600';
+            }
+        }
+    }
+
+    async function updateSchedule() {
+        const cron = document.getElementById('backup-schedule').value;
+        const resp = await authFetch('/api/settings/backup/schedule', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cron_expression: cron, is_active: true})
+        });
+        if (resp.ok) {
+            alert('Schedule updated');
+        }
+    }
+
+    async function loadStatus() {
+        const resp = await authFetch('/api/settings/backup/status');
+        const indicator = document.getElementById('backup-status-indicator');
+        if (resp.ok) {
+            const data = await resp.json();
+            const color = data.restic_installed ? 'bg-green-400' : 'bg-yellow-400';
+            const text = data.restic_installed ? 'Restic Available' : 'Restic Not Installed';
+            indicator.innerHTML = `<span class="inline-block w-3 h-3 rounded-full ${color}"></span><span class="text-sm text-gray-600">${text}</span>`;
+        }
+    }
+
+    // Load data on page init
+    loadConfig();
+    loadHistory();
+    loadStatus();
+
+    // Auto-refresh status every 30 seconds
+    setInterval(loadStatus, 30000);
+</script>
+{% endblock %}

@@ -1,4 +1,5 @@
 from app.models.annotation import Annotation
+from app.models.backup import BackupConfig, BackupJob, BackupSchedule
 from app.models.document import Document
 from app.models.group import Group
 from app.models.user import (
@@ -23,6 +24,9 @@ from app.models.workflow import WorkflowEntry
 
 __all__ = [
     "Annotation",
+    "BackupConfig",
+    "BackupJob",
+    "BackupSchedule",
     "Document",
     "FolderAssignment",
     "Group",

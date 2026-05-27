@@ -29,6 +29,24 @@ class Settings(BaseSettings):
     OLLAMA_MODEL_EMBEDDINGS: str = ""
     OLLAMA_MODEL_CHAT: str = ""
 
+    # Backup settings - MinIO Primary
+    MINIO_PRIMARY_ENDPOINT: str = ""
+    MINIO_PRIMARY_ACCESS_KEY: str = ""
+    MINIO_PRIMARY_SECRET_KEY: str = ""
+    MINIO_PRIMARY_BUCKET: str = "edms-backup"
+
+    # Backup settings - MinIO DR
+    MINIO_DR_ENDPOINT: str = ""
+    MINIO_DR_ACCESS_KEY: str = ""
+    MINIO_DR_SECRET_KEY: str = ""
+    MINIO_DR_BUCKET: str = "edms-backup-dr"
+
+    # Backup settings - Restic
+    RESTIC_REPOSITORY: str = ""
+    RESTIC_PASSWORD: str = ""
+    BACKUP_SCHEDULE: str = "0 2 * * *"
+    BACKUP_RETENTION_DAYS: int = 30
+
     # Bootstrap admin
     BOOTSTRAP_ADMIN_USERNAME: str = "admin"
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
