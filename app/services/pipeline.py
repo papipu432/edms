@@ -4,9 +4,12 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.llm import extract_keywords, generate_embeddings, generate_summary
 from app.models.document import Document, DocumentStatus
+from app.services.chunker import split_text
 from app.services.converter import ConversionService
 from app.services.storage import StorageService
+from app.services.vectordb import VectorDBService
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +91,26 @@ class PipelineService:
 
             # Update document in DB
             document.markdown_path = str(markdown_path)
+
+            # Generate summary and keywords using LLM
+            markdown_content = result.markdown_content
+            summary = generate_summary(markdown_content)
+            keywords = extract_keywords(markdown_content)
+            document.summary = summary
+            document.keywords = keywords
+
+            # Chunk content and index in vector DB
+            chunks = split_text(markdown_content)
+            if chunks:
+                embeddings = generate_embeddings(chunks)
+                vectordb = VectorDBService()
+                vectordb.index_document(
+                    doc_id=document.id,
+                    group_id=document.group_id,
+                    chunks=chunks,
+                    embeddings=embeddings,
+                )
+
             document.status = DocumentStatus.processed
             await db.commit()
 

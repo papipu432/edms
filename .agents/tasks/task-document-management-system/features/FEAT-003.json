@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "LLM integration for summarization and keywords, vector database (ChromaDB) for RAG embeddings and search, and the RAG chat endpoint. This adds the AI-powered features: auto-summarization on document processing, vector indexing, and a chat interface that retrieves relevant document chunks to answer questions.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add dependencies to pyproject.toml: openai, chromadb, tiktoken, langchain-text-splitters (for recursive character text splitting).",
     "Create app/core/llm.py: OpenAI client wrapper that initializes from settings. Provide functions: generate_summary(text) -> str, extract_keywords(text) -> list[str], generate_embeddings(texts: list[str]) -> list[list[float]], chat_completion(messages, context) -> str. Use gpt-4o-mini for summarization/keywords, text-embedding-3-small for embeddings. Include graceful fallback if OPENAI_API_KEY is not set (return placeholder summary, empty keywords).",

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     PDF_ENCRYPTION_PASSWORD: str = "changeme"
     OPENAI_API_KEY: str = ""
     CHUNK_SIZE: int = 1000
+    CHROMA_DB_PATH: str = "./chroma_db"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -28,3 +28,4 @@ env/
 # Project specific
 storage/
 wiki/
+chroma_db/
