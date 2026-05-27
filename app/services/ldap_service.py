@@ -198,12 +198,14 @@ async def authenticate_ldap(
 
     try:
         import ldap3
+        from ldap3.utils.conv import escape_filter_chars
 
         server = ldap3.Server(
             config.server_url, port=config.server_port, use_ssl=config.use_ssl
         )
         search_base = config.user_search_base or config.base_dn
-        user_dn = f"{config.attr_username}={username},{search_base}"
+        safe_username = escape_filter_chars(username)
+        user_dn = f"{config.attr_username}={safe_username},{search_base}"
         conn = ldap3.Connection(
             server,
             user=user_dn,
@@ -215,7 +217,7 @@ async def authenticate_ldap(
 
         conn.search(
             search_base=search_base,
-            search_filter=f"({config.attr_username}={username})",
+            search_filter=f"({config.attr_username}={safe_username})",
             attributes=[
                 config.attr_email,
                 config.attr_display_name,

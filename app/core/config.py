@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
     BOOTSTRAP_ADMIN_EMAIL: str = "admin@edms.local"
 
+    # Registration control
+    ALLOW_REGISTRATION: bool = True
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

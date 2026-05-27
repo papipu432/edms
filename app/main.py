@@ -66,6 +66,8 @@ PERMISSIONS = [
     ("documents", "update"),
     ("documents", "delete"),
     ("ldap", "manage"),
+    ("settings", "manage"),
+    ("security", "manage"),
     ("reports", "read"),
     ("audit", "read"),
 ]

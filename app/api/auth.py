@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
     create_access_token,
@@ -27,6 +28,12 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
     "/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
+    if not settings.ALLOW_REGISTRATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled",
+        )
+
     # Check if username or email already exists
     result = await db.execute(
         select(User).where(
@@ -122,7 +129,14 @@ async def html_login(request: Request, db: AsyncSession = Depends(get_db)):
 
     access_token = create_access_token(data={"sub": user.username})
     response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(key="access_token", value=access_token, httponly=True)
+    is_secure = request.url.scheme == "https"
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="lax",
+        secure=is_secure,
+    )
     return response
 
 

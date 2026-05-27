@@ -120,10 +120,27 @@ async def start_monitor(
     detector = get_detector()
 
     # Set up alert callback to persist alerts to DB
-    async def _persist_alert(alert_data: dict):
-        """This is called from the detector thread - we just store for now."""
-        pass
+    def _persist_alert(alert_data: dict):
+        """Persist alert from detector thread into the database."""
+        from app.core.database import SessionLocal
 
+        session = SessionLocal()
+        try:
+            alert = SecurityAlert(
+                alert_type=alert_data.get("alert_type", "unknown"),
+                severity=alert_data.get("severity", "medium"),
+                message=alert_data.get("message", ""),
+                details_json=alert_data.get("details"),
+                source_path=alert_data.get("source_path"),
+            )
+            session.add(alert)
+            session.commit()
+        except Exception:
+            session.rollback()
+        finally:
+            session.close()
+
+    detector.set_alert_callback(_persist_alert)
     result = detector.start()
     return result
 
