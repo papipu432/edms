@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Comparison</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        table.diff { font-family: monospace; white-space: pre-wrap; width: 100%; }
+        .diff_add { background-color: #dcfce7; }
+        .diff_sub { background-color: #fee2e2; }
+        .diff_chg { background-color: #fef9c3; }
+        td.diff_header { font-weight: bold; background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="bg-gray-50 p-6">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6">Document Comparison</h1>
+
+        {% if doc_a and doc_b %}
+        <p class="mb-4 text-gray-600">
+            Comparing <strong>{{ doc_a.original_filename }}</strong> (ID: {{ doc_a.id }})
+            with <strong>{{ doc_b.original_filename }}</strong> (ID: {{ doc_b.id }})
+        </p>
+        {% endif %}
+
+        <!-- Metadata comparison -->
+        {% if metadata_fields %}
+        <div>
+            <h2 class="text-xl font-bold mb-4">Metadata Comparison</h2>
+            <table class="w-full border-collapse border">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-4 py-2 border text-left">Field</th>
+                        <th class="px-4 py-2 border text-left">Document A</th>
+                        <th class="px-4 py-2 border text-left">Document B</th>
+                        <th class="px-4 py-2 border text-center">Differs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for field in metadata_fields %}
+                    <tr {% if field.differs %}class="bg-red-50"{% endif %}>
+                        <td class="px-4 py-2 font-medium border">{{ field.field }}</td>
+                        <td class="px-4 py-2 border">{{ field.doc_a_value }}</td>
+                        <td class="px-4 py-2 border">{{ field.doc_b_value }}</td>
+                        <td class="px-4 py-2 border text-center">
+                            {% if field.differs %}Yes{% else %}No{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Content diff -->
+        <div class="mt-8">
+            <h2 class="text-xl font-bold mb-4">Content Comparison</h2>
+            {% if diff_table %}
+            <div class="overflow-x-auto border rounded">
+                {{ diff_table | safe }}
+            </div>
+            {% else %}
+            <p class="text-gray-500">No markdown content available for comparison.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
