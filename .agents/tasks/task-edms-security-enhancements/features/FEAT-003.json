@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Add HTML settings page for Backup Management with Restic + MinIO architecture. Configure MinIO endpoints, Restic repository settings, view backup history/status, trigger manual backups, manage retention policies, and configure backup schedules.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "Step 1 - Add backup settings to app/core/config.py: MINIO_PRIMARY_ENDPOINT, MINIO_PRIMARY_ACCESS_KEY, MINIO_PRIMARY_SECRET_KEY, MINIO_PRIMARY_BUCKET, MINIO_DR_ENDPOINT, MINIO_DR_ACCESS_KEY, MINIO_DR_SECRET_KEY, MINIO_DR_BUCKET, RESTIC_REPOSITORY, RESTIC_PASSWORD, BACKUP_SCHEDULE (cron string), BACKUP_RETENTION_DAYS (default 30).",
     "Step 2 - Create app/models/backup.py with SQLAlchemy models: BackupJob (id, status, started_at, finished_at, size_bytes, files_count, target, error_message), BackupSchedule (id, cron_expression, is_active, last_run, next_run), BackupConfig (id, config_key, config_value, updated_at).",
@@ -30,5 +30,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 192 tests pass (181 existing + 11 new). Lint clean. Background task for backup uses try/except to handle DB errors gracefully (in tests, the background task uses a different DB engine than the test fixture). Config updates are runtime-only (not persisted to .env). BackupService handles missing restic binary gracefully. get_db_session async context manager added to database.py for use outside FastAPI dependency injection."
 }
