@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Obsidian Vault Export - Export the LLM Wiki as an Obsidian-compatible vault with [[wikilinks]] syntax, YAML frontmatter with metadata, Dataview-compatible properties. Export API endpoint returning .zip, and sync endpoint for incremental updates.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "Step 1: Create app/services/obsidian_export.py with ObsidianExportService class implementing: convert_wiki_page_to_obsidian(page_path, content) -> converts markdown links to [[wikilinks]] syntax, adds YAML frontmatter with tags/date/source_docs/aliases, ensures Dataview-compatible properties (e.g., type::, source::, created::). Method export_vault(wiki_path) -> generates full vault as a dict of {filename: content} ready for zipping. Method get_sync_changes(since_timestamp) -> list of changed pages since last sync.",
     "Step 2: In the export service, implement the frontmatter generation: parse each wiki page to extract metadata (document IDs referenced, entity names, topic names), generate YAML frontmatter with fields: title, tags (from topics/keywords), aliases, date_created, date_modified, source_documents (list of doc IDs), type (entity/topic/summary). Convert internal markdown links like [text](../entities/foo.md) to [[foo]] wikilinks.",
@@ -22,5 +22,5 @@
     "uv run pytest tests/test_obsidian_export.py -v"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 30 new tests pass. Full test suite (434 tests) passes. Ruff lint clean. Implemented: ObsidianExportService with wikilink conversion, YAML frontmatter with Dataview properties (double-colon format), vault zip export, and sync changes detection. API endpoints registered at /api/wiki/export/obsidian with full vault zip download, sync endpoint, and per-page export."
 }
