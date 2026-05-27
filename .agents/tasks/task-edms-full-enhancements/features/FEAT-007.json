@@ -2,7 +2,7 @@
   "id": "FEAT-007",
   "type": "feat",
   "description": "Chat Improvements - Persistent conversation history per user, multi-turn context with reference to previous messages, source document highlighting showing which chunks were used, export chat as markdown, and chat with specific document or group scope.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1: Create app/models/chat.py with models: ChatSession(id, user_id FK, title, scope_type: 'global'|'document'|'group', scope_id: nullable int, created_at, updated_at), ChatMessage(id, session_id FK, role: 'user'|'assistant', content: text, sources_json: list of {doc_id, chunk_text, score}, created_at).",
     "Step 2: Create app/schemas/chat.py with Pydantic schemas: ChatSessionCreate(title, scope_type, scope_id), ChatSessionResponse(id, title, scope_type, scope_id, created_at, message_count), ChatMessageResponse(id, role, content, sources, created_at), ChatSendRequest(session_id, message, scope_type, scope_id), ChatSendResponse(message: ChatMessageResponse, session: ChatSessionResponse), ChatExportResponse(format: 'markdown', content: str).",
