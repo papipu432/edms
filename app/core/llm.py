@@ -5,8 +5,15 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from app.core.config import settings
+from app.services.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
+
+# Circuit breaker for LLM external calls
+_llm_circuit_breaker = CircuitBreaker(
+    failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+    recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
+)
 
 
 def _is_ollama_provider() -> bool:
@@ -33,6 +40,7 @@ def generate_summary(text: str) -> str:
 
     Returns a placeholder string if no API key is configured.
     Uses Ollama if LLM_PROVIDER is set to 'ollama'.
+    Uses circuit breaker for external calls.
     """
     if _is_ollama_provider():
         model_name = settings.OLLAMA_MODEL_SUMMARIZE
@@ -45,16 +53,19 @@ def generate_summary(text: str) -> str:
     if model is None:
         return "Summary not available (no API key configured)"
 
-    try:
+    def _invoke():
         messages = [
             SystemMessage(content="You are a helpful assistant that summarizes documents concisely."),
             HumanMessage(content=f"Please provide a concise summary of the following text:\n\n{text[:4000]}"),
         ]
         result = model.invoke(messages)
         return result.content or ""
-    except Exception as e:
-        logger.error("Failed to generate summary: %s", e)
-        return "Summary not available (generation failed)"
+
+    result = _llm_circuit_breaker.call(
+        _invoke,
+        fallback="Summary not available (service temporarily unavailable)",
+    )
+    return result
 
 
 def extract_keywords(text: str) -> list[str]:
@@ -62,6 +73,7 @@ def extract_keywords(text: str) -> list[str]:
 
     Returns an empty list if no API key is configured.
     Uses Ollama if LLM_PROVIDER is set to 'ollama'.
+    Uses circuit breaker for external calls.
     """
     if _is_ollama_provider():
         model_name = settings.OLLAMA_MODEL_KEYWORDS
@@ -73,7 +85,7 @@ def extract_keywords(text: str) -> list[str]:
     if model is None:
         return []
 
-    try:
+    def _invoke():
         messages = [
             SystemMessage(
                 content="You are a helpful assistant that extracts keywords from documents. "
@@ -85,9 +97,9 @@ def extract_keywords(text: str) -> list[str]:
         content = result.content or ""
         keywords = [k.strip() for k in content.split(",") if k.strip()]
         return keywords
-    except Exception as e:
-        logger.error("Failed to extract keywords: %s", e)
-        return []
+
+    result = _llm_circuit_breaker.call(_invoke, fallback=[])
+    return result
 
 
 def generate_embeddings(texts: list[str]) -> list[list[float]]:
@@ -95,6 +107,7 @@ def generate_embeddings(texts: list[str]) -> list[list[float]]:
 
     Returns zero vectors if no API key is configured.
     Uses Ollama if LLM_PROVIDER is set to 'ollama'.
+    Uses circuit breaker for external calls.
     """
     if _is_ollama_provider():
         model_name = settings.OLLAMA_MODEL_EMBEDDINGS
@@ -105,14 +118,16 @@ def generate_embeddings(texts: list[str]) -> list[list[float]]:
     if not settings.OPENAI_API_KEY:
         return [[0.0] * 1536 for _ in texts]
 
-    try:
+    fallback = [[0.0] * 1536 for _ in texts]
+
+    def _invoke():
         embeddings_model = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY
         )
         return embeddings_model.embed_documents(texts)
-    except Exception as e:
-        logger.error("Failed to generate embeddings: %s", e)
-        return [[0.0] * 1536 for _ in texts]
+
+    result = _llm_circuit_breaker.call(_invoke, fallback=fallback)
+    return result
 
 
 def chat_completion(messages: list, context: str) -> str:
@@ -120,6 +135,7 @@ def chat_completion(messages: list, context: str) -> str:
 
     Returns an error message if no API key is configured.
     Uses Ollama if LLM_PROVIDER is set to 'ollama'.
+    Uses circuit breaker for external calls.
     """
     if _is_ollama_provider():
         model_name = settings.OLLAMA_MODEL_CHAT
@@ -131,7 +147,7 @@ def chat_completion(messages: list, context: str) -> str:
     if model is None:
         return "Chat is not available (no API key configured)"
 
-    try:
+    def _invoke():
         system_content = (
             "You are a helpful assistant that answers questions based on the provided context. "
             "Use the context below to answer the user's question. If the answer is not in the "
@@ -150,9 +166,12 @@ def chat_completion(messages: list, context: str) -> str:
         ]
         result = model.invoke(messages_list)
         return result.content
-    except Exception as e:
-        logger.error("Failed to complete chat: %s", e)
-        return "Chat completion failed due to an error."
+
+    result = _llm_circuit_breaker.call(
+        _invoke,
+        fallback="Chat completion failed (service temporarily unavailable)",
+    )
+    return result
 
 
 def extract_entities_topics(text: str) -> dict:

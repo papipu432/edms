@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Comprehensive Error Handling - Global exception handlers, structured error responses, request ID tracking, rate limiting, and circuit breaker pattern for external services",
+  "status": "in_progress",
+  "steps": [
+    "Create app/services/error_handling.py with: (a) Error taxonomy as exception classes (ValidationError, AuthError, PermissionError, NotFoundError, ConflictError, ProcessingError, StorageError, EncryptionError, KMSError), each with an error_code string. (b) A structured ErrorResponse Pydantic model with fields: error_code, message, detail, request_id, timestamp. (c) A circuit breaker class (CircuitBreaker) with states open/closed/half-open, configurable failure_threshold, recovery_timeout, and methods call/record_success/record_failure.",
+    "Create app/middleware/__init__.py and app/middleware/error_handler.py with: (a) Request ID middleware that generates a UUID for each request, stores it in request.state.request_id, and adds X-Request-ID header to response. (b) Global exception handlers registered on the FastAPI app for each custom exception class, returning structured JSON ErrorResponse with appropriate HTTP status codes (400 for validation, 401 for auth, 403 for permission, 404 for not found, 409 for conflict, 500 for processing/storage/encryption/kms). (c) A fallback handler for unhandled exceptions returning 500 with generic message (never exposing internal details).",
+    "Create app/middleware/rate_limiter.py with: (a) A simple in-memory rate limiter (sliding window counter per IP address). (b) Configurable via settings: RATE_LIMIT_REQUESTS_PER_MINUTE (default 60), RATE_LIMIT_BURST (default 10). (c) Returns 429 Too Many Requests with Retry-After header when exceeded. (d) Apply as FastAPI middleware.",
+    "Update app/main.py to: (a) Register the request ID middleware. (b) Register the rate limiter middleware. (c) Register the global exception handlers. (d) Ensure error logging includes request_id but never logs sensitive data (passwords, keys, tokens).",
+    "Update app/core/config.py Settings class to add: RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60, RATE_LIMIT_BURST: int = 10, CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5, CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 30.",
+    "Create app/services/circuit_breaker.py that wraps external service calls (Ollama, OpenAI, MinIO) with circuit breaker. The circuit breaker should: track consecutive failures, open circuit after threshold, return graceful fallback when open, attempt recovery after timeout. Apply circuit breaker in app/core/llm.py functions (generate_summary, extract_keywords, generate_embeddings, chat_completion) so that if LLM is unavailable, functions return placeholder values without raising exceptions.",
+    "Create tests/test_error_handling.py with tests for: (a) Request ID is added to all responses. (b) Custom exceptions return correct HTTP status codes and structured error response. (c) Rate limiter blocks after exceeding limit. (d) Circuit breaker opens after consecutive failures and closes after recovery. (e) Unhandled exceptions return 500 with generic message.",
+    "Ensure all 481 existing tests still pass by not changing the behavior of existing endpoints, only adding middleware around them."
+  ],
+  "acceptance_criteria": [
+    "All API responses include X-Request-ID header with UUID",
+    "Custom exception classes exist and map to correct HTTP status codes with structured JSON body",
+    "Rate limiter returns 429 after exceeding configured limit",
+    "Circuit breaker opens after consecutive failures to external services and returns graceful fallback",
+    "Error responses never contain sensitive data (passwords, keys)",
+    "All existing 481 tests continue to pass",
+    "New tests in test_error_handling.py all pass"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

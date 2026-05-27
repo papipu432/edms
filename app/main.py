@@ -11,6 +11,8 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine
 from app.core.security import hash_password
+from app.middleware.error_handler import RequestIDMiddleware, register_exception_handlers
+from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.models.group import Base
 from app.models.user import (
     OrgGrade,
@@ -281,6 +283,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(title="EDMS", version="0.1.0", lifespan=lifespan)
 
+# Register global exception handlers
+register_exception_handlers(app)
+
+# Middleware order matters: outermost middleware runs first.
+# CORS must be outermost, then rate limiter, then request ID.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -288,6 +295,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(
+    RateLimiterMiddleware,
+    requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
+    burst=settings.RATE_LIMIT_BURST,
+)
+
+app.add_middleware(RequestIDMiddleware)
 
 # Mount setup wizard routes (active only when first-launch detected)
 app.include_router(setup_wizard_router)

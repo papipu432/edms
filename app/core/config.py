@@ -73,6 +73,14 @@ class Settings(BaseSettings):
     # Registration control
     ALLOW_REGISTRATION: bool = True
 
+    # Rate limiting
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
+    RATE_LIMIT_BURST: int = 10
+
+    # Circuit breaker
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 30
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

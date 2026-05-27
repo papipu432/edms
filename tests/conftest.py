@@ -8,7 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import get_db
 from app.main import app
+from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.models.group import Base
+
+
+def _reset_rate_limiter() -> None:
+    """Reset the rate limiter state in the app middleware stack."""
+    # Walk the middleware stack to find the RateLimiterMiddleware instance
+    middleware = app.middleware_stack
+    while middleware is not None:
+        if isinstance(middleware, RateLimiterMiddleware):
+            middleware.reset()
+            break
+        middleware = getattr(middleware, "app", None)
 
 
 @pytest.fixture(scope="session")
@@ -59,6 +71,13 @@ async def client(db_session: AsyncSession, tmp_path: Path) -> AsyncGenerator[Asy
         yield ac
 
     app.dependency_overrides.clear()
+
+    # Reset rate limiter state after each test
+    _reset_rate_limiter()
+
+    # Reset circuit breaker state after each test
+    from app.core.llm import _llm_circuit_breaker
+    _llm_circuit_breaker.reset()
 
 
 @pytest.fixture
