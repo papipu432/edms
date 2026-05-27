@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Implement RansomwareDetector class with behavioral monitoring of the data/ directory, bulk encryption pattern detection, alerting, and quarantine capabilities. Add an HTML monitoring page showing status and alerts.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Create app/models/security.py with SQLAlchemy models: SecurityAlert (id, alert_type, severity, message, details_json, source_path, detected_at, acknowledged, acknowledged_by, acknowledged_at), MonitoringConfig (id, config_key, config_value, updated_at).",
     "Step 2 - Create app/services/ransomware_detector.py with the RansomwareDetector class. Features: (a) monitors file operations on configurable data directory using watchdog (filesystem events library), (b) tracks operation rates (ops/sec) with sliding window, (c) detects bulk encryption patterns (many file writes in short time, entropy analysis of written content), (d) configurable thresholds (default: 50 ops/sec triggers alert), (e) can pause/quarantine suspicious operations by moving files to quarantine dir, (f) integrates with SecurityAlert model to persist alerts, (g) start/stop methods for lifecycle management. Handle watchdog import gracefully (add as optional dep).",
@@ -30,5 +30,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 219 tests pass (192 existing + 27 new). Watchdog 6.0.0 installed. Detector handles missing watchdog gracefully. Singleton pattern with reset_detector() for test isolation."
 }
