@@ -68,6 +68,7 @@ async def create_lifecycle(
 )
 async def get_lifecycle(
     document_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     document = await db.get(Document, document_id)
@@ -128,6 +129,7 @@ async def transition_lifecycle(
 )
 async def get_lifecycle_history(
     document_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     document = await db.get(Document, document_id)
@@ -158,6 +160,7 @@ async def get_lifecycle_history(
 async def get_lifecycle_alerts(
     days_before_expiry: int = 30,
     days_before_review: int = 14,
+    current_user: User = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ):
     alerts_data = await lifecycle_service.get_alerts(

@@ -342,7 +342,10 @@ async def test_transition_history(client: AsyncClient, db_session: AsyncSession)
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    response = await client.get(f"/api/documents/{doc.id}/lifecycle/history")
+    response = await client.get(
+        f"/api/documents/{doc.id}/lifecycle/history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
@@ -368,7 +371,10 @@ async def test_get_lifecycle_alerts_expiring(
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    response = await client.get("/api/lifecycle/alerts?days_before_expiry=30")
+    response = await client.get(
+        "/api/lifecycle/alerts?days_before_expiry=30",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 1
@@ -417,7 +423,10 @@ async def test_get_lifecycle_alerts_needs_review(
     lifecycle.next_review_at = datetime.now(timezone.utc) - timedelta(days=1)
     await db_session.flush()
 
-    response = await client.get("/api/lifecycle/alerts?days_before_review=14")
+    response = await client.get(
+        "/api/lifecycle/alerts?days_before_review=14",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert response.status_code == 200
     data = response.json()
     review_alerts = [a for a in data["alerts"] if a["alert_type"] == "review"]
@@ -444,6 +453,7 @@ async def test_lifecycle_not_found(client: AsyncClient, db_session: AsyncSession
 
     response = await client.get(
         "/api/documents/9999/lifecycle",
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 404
 
@@ -461,3 +471,94 @@ async def test_check_alerts_admin_only(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_lifecycle_requires_auth(
+    client: AsyncClient, db_session: AsyncSession
+):
+    doc = await _create_document(db_session)
+
+    response = await client.get(f"/api/documents/{doc.id}/lifecycle")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_lifecycle_history_requires_auth(
+    client: AsyncClient, db_session: AsyncSession
+):
+    doc = await _create_document(db_session)
+
+    response = await client.get(f"/api/documents/{doc.id}/lifecycle/history")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_lifecycle_alerts_requires_admin(
+    client: AsyncClient, db_session: AsyncSession
+):
+    user, token = await _create_user_with_roles(
+        db_session, ["editor"], username="editoruser2"
+    )
+
+    response = await client.get(
+        "/api/lifecycle/alerts",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_lifecycle_alerts_unauthenticated(
+    client: AsyncClient, db_session: AsyncSession
+):
+    response = await client.get("/api/lifecycle/alerts")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_transition_expired_to_draft(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """Test that an expired document can be reactivated by transitioning to draft."""
+    user, token = await _create_user_with_roles(db_session, ["admin"])
+    doc = await _create_document(db_session)
+
+    # Go through full cycle to expired
+    await client.post(
+        f"/api/documents/{doc.id}/lifecycle",
+        json={"lifecycle_type": "permanent"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    await client.post(
+        f"/api/documents/{doc.id}/lifecycle/transition",
+        json={"target_state": "in_review"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    await client.post(
+        f"/api/documents/{doc.id}/lifecycle/transition",
+        json={"target_state": "approved"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    await client.post(
+        f"/api/documents/{doc.id}/lifecycle/transition",
+        json={"target_state": "up_to_date"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    response = await client.post(
+        f"/api/documents/{doc.id}/lifecycle/transition",
+        json={"target_state": "expired"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["state"] == "expired"
+
+    # Now reactivate by transitioning back to draft
+    response = await client.post(
+        f"/api/documents/{doc.id}/lifecycle/transition",
+        json={"target_state": "draft", "comment": "Reactivating expired document"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["state"] == "draft"

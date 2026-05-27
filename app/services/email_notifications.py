@@ -5,6 +5,8 @@ from email.mime.text import MIMEText
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.lifecycle import DocumentLifecycle
+from app.models.user import User
 from app.services.lifecycle import LifecycleService
 
 logger = logging.getLogger(__name__)
@@ -75,12 +77,18 @@ class EmailNotificationService:
             document_name = alert["document_name"]
             alert_type = alert["alert_type"]
             days_remaining = alert["days_remaining"]
+            lifecycle_id = alert["lifecycle_id"]
 
-            # For simplicity, log alerts. In a full implementation,
-            # we would look up assigned users via FolderAssignment
-            # and send to each user's email.
+            # Resolve the assigned reviewer's email from the lifecycle record
+            to_email = self.from_email
+            lifecycle = await db.get(DocumentLifecycle, lifecycle_id)
+            if lifecycle and lifecycle.assigned_reviewer_id:
+                reviewer = await db.get(User, lifecycle.assigned_reviewer_id)
+                if reviewer and reviewer.email:
+                    to_email = reviewer.email
+
             self.send_lifecycle_alert(
-                to_email=self.from_email,
+                to_email=to_email,
                 document_name=document_name,
                 alert_type=alert_type,
                 days_remaining=days_remaining,

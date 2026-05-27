@@ -28,6 +28,7 @@ class LifecycleService:
             DocumentLifecycleState.in_review,
             DocumentLifecycleState.expired,
         ],
+        DocumentLifecycleState.expired: [DocumentLifecycleState.draft],
     }
 
     async def create_lifecycle(
