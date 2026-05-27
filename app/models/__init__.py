@@ -1,4 +1,5 @@
 from app.models.annotation import Annotation
+from app.models.audit import DocumentAuditLog
 from app.models.backup import BackupConfig, BackupJob, BackupSchedule
 from app.models.document import Document
 from app.models.encryption import EncryptionKey, KeyShare
@@ -36,6 +37,7 @@ __all__ = [
     "BackupJob",
     "BackupSchedule",
     "Document",
+    "DocumentAuditLog",
     "DocumentLifecycle",
     "DocumentLifecycleState",
     "EncryptionKey",
