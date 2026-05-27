@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-006",
+  "type": "feat",
+  "description": "Document Comparison - Side-by-side diff for markdown documents, metadata comparison for any documents, version-to-version diff. Returns structured diff data and HTML rendering.",
+  "status": "completed",
+  "steps": [
+    "Create app/services/comparison.py with a ComparisonService class: (a) compare_metadata(doc_a: Document, doc_b: Document) -> dict - field-by-field comparison of metadata (filename, size, type, status, created_at, updated_at, keywords, summary). Returns dict with fields showing values from both docs and whether they differ. (b) compare_markdown(content_a: str, content_b: str) -> dict - generates unified diff using Python's difflib. Returns dict with: unified_diff (string), additions_count, deletions_count, similarity_ratio (SequenceMatcher). (c) compare_versions(db, document_id, version_a_num, version_b_num) -> dict - loads markdown content of two versions (if available) and returns both metadata comparison and content diff. (d) generate_diff_html(content_a: str, content_b: str, label_a: str, label_b: str) -> str - uses difflib.HtmlDiff to generate a side-by-side HTML table showing differences.",
+    "Create app/schemas/comparison.py with Pydantic schemas: MetadataComparisonResponse (fields dict showing both values), ContentDiffResponse (unified_diff, additions, deletions, similarity_ratio), ComparisonResponse (metadata_comparison, content_diff nullable, diff_html nullable), CompareRequest (doc_a_id, doc_b_id as query params).",
+    "Create app/api/compare.py with APIRouter (tags=['compare']): (a) GET /api/documents/compare?doc_a={id}&doc_b={id} - compares two different documents. Returns metadata comparison and content diff if both have markdown. (b) GET /api/documents/{document_id}/versions/diff?version_a={n}&version_b={n} - compares two versions of the same document. Returns content diff. (c) GET /api/documents/compare/html?doc_a={id}&doc_b={id} - returns an HTML page with side-by-side highlighted comparison (uses Jinja2 template or inline HTML via difflib.HtmlDiff).",
+    "Create app/templates/compare.html - a Jinja2 template showing side-by-side diff with Tailwind CSS styling. Shows document metadata at top, then diff below with additions highlighted in green and deletions in red.",
+    "Register the compare router in app/api/router.py.",
+    "Create tests/test_compare.py with tests for: (a) Metadata comparison shows field differences correctly. (b) Markdown diff shows additions and deletions. (c) Similarity ratio is calculated correctly. (d) HTML diff endpoint returns valid HTML. (e) Comparing non-existent documents returns 404. (f) Version diff works for same document's versions."
+  ],
+  "acceptance_criteria": [
+    "GET /api/documents/compare?doc_a={id}&doc_b={id} returns structured comparison data",
+    "Metadata comparison shows field-by-field differences",
+    "Markdown content diff shows unified diff with additions/deletions count",
+    "HTML comparison endpoint returns styled side-by-side diff",
+    "Version-to-version comparison works within a single document",
+    "All existing tests continue to pass",
+    "New tests in test_compare.py all pass"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": "All 592 tests pass (576 existing + 16 new). Compare router registered before documents_router to avoid any potential path conflicts. Used inline HTML generation instead of Jinja2 template rendering for the /compare/html endpoint to avoid needing to configure Jinja2 template lookup in the router."
+}
