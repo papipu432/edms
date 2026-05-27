@@ -67,29 +67,43 @@ class PipelineService:
 
             # Save markdown output
             group_id = document.group_id
-            base_path = self.storage.base_path
-            markdown_dir = base_path / str(group_id) / "markdown"
-            markdown_dir.mkdir(parents=True, exist_ok=True)
-            markdown_path = markdown_dir / f"{doc_id}.md"
-            markdown_path.write_text(result.markdown_content, encoding="utf-8")
+
+            # Use new data layout if available, with backward compat
+            md_content_bytes = result.markdown_content.encode("utf-8")
+            markdown_path = self.storage.save_to_data(
+                group_id, "md", f"{doc_id}.md", md_content_bytes
+            )
 
             # Save extracted images
             if result.images:
-                images_dir = base_path / str(group_id) / "images" / str(doc_id)
-                images_dir.mkdir(parents=True, exist_ok=True)
                 for idx, img in enumerate(result.images):
-                    img_path = images_dir / f"image_{idx}.png"
                     if hasattr(img, "save"):
-                        img.save(str(img_path))
-                    # If img is already a Path, it's already saved
+                        import io
+
+                        buf = io.BytesIO()
+                        img.save(buf, format="PNG")
+                        img_bytes = buf.getvalue()
+                    else:
+                        # img is a Path
+                        img_bytes = Path(img).read_bytes() if not isinstance(img, bytes) else img
+                    self.storage.save_to_data(
+                        group_id, "images", f"{doc_id}_image_{idx}.png", img_bytes
+                    )
 
             # Save tables as CSV
             if result.tables:
-                tables_dir = base_path / str(group_id) / "tables" / str(doc_id)
-                tables_dir.mkdir(parents=True, exist_ok=True)
                 for idx, csv_content in enumerate(result.tables):
-                    table_path = tables_dir / f"table_{idx}.csv"
-                    table_path.write_text(csv_content, encoding="utf-8")
+                    csv_bytes = csv_content.encode("utf-8")
+                    self.storage.save_to_data(
+                        group_id, "csv", f"{doc_id}_table_{idx}.csv", csv_bytes
+                    )
+
+            # Move original to data/raw/
+            if file_path.exists():
+                raw_content = file_path.read_bytes()
+                self.storage.save_to_data(
+                    group_id, "raw", file_path.name, raw_content
+                )
 
             # Update document in DB
             document.markdown_path = str(markdown_path)

@@ -1,6 +1,7 @@
 from app.models.annotation import Annotation
 from app.models.backup import BackupConfig, BackupJob, BackupSchedule
 from app.models.document import Document
+from app.models.encryption import EncryptionKey, KeyShare
 from app.models.group import Group
 from app.models.security import MonitoringConfig, SecurityAlert
 from app.models.user import (
@@ -29,8 +30,10 @@ __all__ = [
     "BackupJob",
     "BackupSchedule",
     "Document",
+    "EncryptionKey",
     "FolderAssignment",
     "Group",
+    "KeyShare",
     "MonitoringConfig",
     "SecurityAlert",
     "LdapConfig",

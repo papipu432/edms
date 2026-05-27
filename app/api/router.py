@@ -13,6 +13,7 @@ from app.api.search import router as search_router
 from app.api.settings_llm import router as settings_llm_router
 from app.api.security import router as security_router
 from app.api.settings_backup import router as settings_backup_router
+from app.api.settings_encryption import router as settings_encryption_router
 from app.api.users import router as users_router
 from app.api.wiki import router as wiki_router
 from app.api.workflow import router as workflow_router
@@ -34,3 +35,4 @@ api_router.include_router(ldap_router)
 api_router.include_router(settings_llm_router)
 api_router.include_router(settings_backup_router)
 api_router.include_router(security_router)
+api_router.include_router(settings_encryption_router)
