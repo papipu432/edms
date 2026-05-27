@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add Marker (Surya OCR) and Docling as document conversion engines in converter.py, and add OpenCV-based image preprocessing alongside existing Pillow in preprocessing.py. Keep existing pytesseract/PyMuPDF/python-docx as fallbacks.",
+  "status": "in_progress",
+  "steps": [
+    "Add new dependencies to pyproject.toml via 'uv add': marker-pdf, docling, opencv-python-headless. Run 'uv sync' to verify they install.",
+    "Enhance app/services/preprocessing.py: Add OpenCV-based methods alongside existing Pillow methods. Add methods: opencv_deskew (using Hough line transform to detect skew angle), opencv_adaptive_threshold (adaptive thresholding for binarization), opencv_morphological_denoise (morphological open/close operations). Modify preprocess_pipeline to accept an optional engine parameter ('pillow' or 'opencv', default 'pillow') and route to appropriate implementation. Keep the existing Pillow methods unchanged. Add a new opencv_pipeline method that chains: convert to grayscale, adaptive threshold, morphological denoise, deskew. Import cv2 and numpy; use PIL-to-numpy and numpy-to-PIL conversions.",
+    "Enhance app/services/converter.py: Add convert_pdf_marker() method that uses the Marker library (from marker.converters.pdf import PdfConverter or equivalent). Marker uses Surya OCR internally for PDF-to-markdown conversion. It returns structured markdown with tables and images. Add convert_pdf_docling() method that uses the Docling library (from docling.document_converter import DocumentConverter). Docling converts PDFs to structured documents with markdown export.",
+    "Add a conversion engine selection mechanism: Add a ConversionEngine enum (PYMUPDF, MARKER, DOCLING) to converter.py. Modify ConversionService.__init__ to accept an optional preferred_engine parameter. Modify convert_pdf() to try the preferred engine first, falling back to PyMuPDF+pytesseract if the preferred engine fails. The fallback order should be: preferred -> PyMuPDF with text extraction -> pytesseract OCR.",
+    "Add convert_image_opencv() method in converter.py that uses OpenCV preprocessing before OCR (using the new opencv_pipeline from preprocessing).",
+    "Add tests in tests/test_converter_engines.py: Test that convert_pdf_marker returns ConversionResult (mock marker internals). Test that convert_pdf_docling returns ConversionResult (mock docling internals). Test that the fallback mechanism works when preferred engine raises an exception. Test opencv preprocessing methods produce valid images. Test the engine selection enum and routing logic."
+  ],
+  "acceptance_criteria": [
+    "Running 'uv sync' installs marker-pdf, docling, and opencv-python-headless without errors",
+    "PreprocessingService has both pillow and opencv pipelines callable via engine parameter",
+    "ConversionService can be instantiated with ConversionEngine.MARKER or ConversionEngine.DOCLING",
+    "convert_pdf() falls back gracefully to PyMuPDF when preferred engine fails",
+    "All existing 82 tests still pass (no regressions)",
+    "New tests in test_converter_engines.py pass",
+    "Running 'uv run ruff check app/ tests/' passes"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

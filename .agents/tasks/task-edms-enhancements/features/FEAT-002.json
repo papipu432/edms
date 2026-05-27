@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-002",
+  "type": "refactor",
+  "description": "Replace raw OpenAI SDK usage in app/core/llm.py with LangChain for LLM orchestration. Migrate summarization, keyword extraction, embeddings, and RAG chat to use LangChain chains, prompt templates, and embedding models. Add scanner service with pytwain and pyinsane2 support.",
+  "status": "pending",
+  "steps": [
+    "Add new dependencies via 'uv add': langchain, langchain-openai, langchain-core, pytwain, pyinsane2. Run 'uv sync'. Note: pytwain and pyinsane2 are platform-specific (Windows/Linux) so they may only install as stubs - that's fine for the interface.",
+    "Rewrite app/core/llm.py to use LangChain: Replace get_llm_client() with get_chat_model() that returns a ChatOpenAI instance (or None if no key). Replace generate_summary() to use a LangChain chain: ChatPromptTemplate.from_messages() with system/human templates piped to the chat model via LCEL (prompt | model | StrOutputParser). Replace extract_keywords() similarly with a chain that parses comma-separated output. Replace generate_embeddings() to use langchain_openai.OpenAIEmbeddings with embed_documents(). Replace chat_completion() to use a chain with system prompt containing RAG context. Keep the same function signatures and return types so callers (pipeline.py, search.py, wiki.py) don't need changes. Keep the same fallback behavior (return placeholders when no API key).",
+    "Update app/services/wiki.py: Replace the direct OpenAI client calls in _extract_entities_and_topics() and _merge_page_content() with calls through the new LangChain-based functions in app/core/llm.py. Add two new helper functions to llm.py if needed: extract_entities_topics(text) -> dict and merge_content(existing, new_info) -> str, both using LangChain chains.",
+    "Create app/services/scanner.py: Define a ScannerBackend abstract base class (ABC) with methods: list_devices() -> list[dict], scan(device_id, settings) -> Path (returns path to scanned image), get_device_capabilities(device_id) -> dict. Create TwainScanner(ScannerBackend) that wraps pytwain for Windows/Fujitsu scanners. Create InsaneScanner(ScannerBackend) that wraps pyinsane2 for Linux/desktop scanners. Create ScannerService class with auto_detect_backend() that picks TwainScanner on Windows and InsaneScanner on Linux/Mac. The scan() method should save scanned images to a temp directory and return the path. Handle import errors gracefully (pytwain only on Windows, pyinsane2 only on Linux).",
+    "Create app/api/scanner.py: Add scanner API routes: GET /api/scanner/devices (list available scanners), POST /api/scanner/scan (scan document with device_id and optional settings like dpi, color_mode, paper_size). The scan endpoint should save the scanned image and optionally feed it into the document pipeline. Include the scanner router in app/api/router.py.",
+    "Create app/schemas/scanner.py: Define ScannerDevice (id, name, backend, capabilities), ScanRequest (device_id, dpi, color_mode, paper_size), ScanResponse (file_path, status).",
+    "Update tests/test_llm.py: Update all mocks to match the new LangChain-based implementation. The tests should mock langchain_openai.ChatOpenAI and OpenAIEmbeddings instead of openai.OpenAI directly. Keep the same test structure (test with no key, test with mocked response, test exception handling).",
+    "Create tests/test_scanner.py: Test ScannerService.auto_detect_backend() returns appropriate backend based on platform (mock sys.platform). Test that TwainScanner and InsaneScanner handle ImportError gracefully. Test scanner API endpoints with mocked scanner service."
+  ],
+  "acceptance_criteria": [
+    "app/core/llm.py uses LangChain (ChatOpenAI, OpenAIEmbeddings, ChatPromptTemplate, LCEL chains) instead of raw openai SDK",
+    "All existing callers (pipeline.py, search.py, wiki.py) continue to work without changes to their import/call patterns",
+    "generate_summary, extract_keywords, generate_embeddings, chat_completion maintain same signatures and return types",
+    "ScannerService provides unified interface for pytwain and pyinsane2 with graceful fallback",
+    "Scanner API endpoints are registered and respond",
+    "All existing tests pass (updated mocks) plus new scanner tests pass",
+    "Running 'uv run ruff check app/ tests/' passes"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

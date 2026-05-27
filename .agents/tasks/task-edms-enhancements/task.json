@@ -1,0 +1,7 @@
+{
+  "task_id": "task-edms-enhancements",
+  "task_description": "Enhance existing EDMS application with: (1) Marker/Docling document conversion + OpenCV preprocessing, (2) LangChain LLM migration + scanner service, (3) RBAC with JWT auth and folder assignments, (4) Jinja2 HTML frontend with workflow/annotation/cross-reference pages.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

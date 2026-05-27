@@ -10,7 +10,9 @@ dependencies = [
     "chromadb>=1.5.9",
     "fastapi>=0.136.3",
     "langchain-text-splitters>=1.1.2",
+    "numpy>=2.0.0",
     "openai>=2.38.0",
+    "opencv-python-headless>=4.13.0.92",
     "pandas>=3.0.3",
     "pikepdf>=10.7.2",
     "pillow>=12.2.0",
@@ -23,6 +25,11 @@ dependencies = [
     "tiktoken>=0.13.0",
     "uvicorn[standard]>=0.48.0",
 ]
+
+# Note: marker-pdf and docling have version conflicts with pillow>=12.
+# They cannot be installed in the current environment but the code handles
+# their absence gracefully via try/except imports. Install them manually
+# in environments with compatible pillow versions.
 
 [dependency-groups]
 dev = [
