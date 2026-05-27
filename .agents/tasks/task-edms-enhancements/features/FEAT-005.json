@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "fix",
   "description": "Fix template injection in remaining LLM functions (generate_summary, extract_keywords, extract_entities_topics, merge_content) and fix scanner endpoint returning path to deleted file.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Replace ChatPromptTemplate pattern in generate_summary, extract_keywords, extract_entities_topics, and merge_content with direct SystemMessage/HumanMessage objects to avoid template injection from curly braces in document content.",
     "Remove cleanup_scan() call from scan_document endpoint in app/api/scanner.py so the returned file_path points to an existing file.",
@@ -21,5 +21,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "Both fixes applied successfully. All 170 tests pass. Ruff lint clean. Removed ChatPromptTemplate and StrOutputParser imports since they are no longer used anywhere in the codebase."
 }
