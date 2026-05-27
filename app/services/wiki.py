@@ -1,10 +1,13 @@
-import json
 import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.core.llm import chat_completion, get_llm_client
+from app.core.llm import (
+    chat_completion,
+    extract_entities_topics,
+    merge_content,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,66 +50,11 @@ class WikiService:
 
     def _extract_entities_and_topics(self, content: str) -> dict:
         """Use LLM to extract entities and topics from content."""
-        client = get_llm_client()
-        if client is None:
-            return {"entities": [], "topics": []}
-
-        prompt = (
-            "Extract key entities (people, organizations, technologies, places) "
-            "and topics (concepts, themes, subjects) from the following text. "
-            "Return a JSON object with two keys: 'entities' (list of strings) "
-            "and 'topics' (list of strings). Return ONLY the JSON, no other text.\n\n"
-            f"Text:\n{content[:4000]}"
-        )
-
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You extract structured information from text. Always return valid JSON."},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=500,
-            )
-            result_text = response.choices[0].message.content or "{}"
-            # Try to parse JSON from the response
-            result_text = result_text.strip()
-            if result_text.startswith("```"):
-                # Strip code fences
-                lines = result_text.split("\n")
-                result_text = "\n".join(lines[1:-1])
-            return json.loads(result_text)
-        except (json.JSONDecodeError, Exception) as e:
-            logger.error("Failed to extract entities/topics: %s", e)
-            return {"entities": [], "topics": []}
+        return extract_entities_topics(content)
 
     def _merge_page_content(self, existing_content: str, new_info: str) -> str:
         """Use LLM to merge new information into an existing wiki page."""
-        client = get_llm_client()
-        if client is None:
-            return existing_content + "\n\n" + new_info
-
-        prompt = (
-            "You are updating a wiki page. Merge the new information into the existing page content. "
-            "Keep the page well-organized and avoid duplicating information. "
-            "Return ONLY the updated markdown content.\n\n"
-            f"Existing page:\n{existing_content}\n\n"
-            f"New information to integrate:\n{new_info}"
-        )
-
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a wiki editor that merges information cleanly."},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=1000,
-            )
-            return response.choices[0].message.content or existing_content
-        except Exception as e:
-            logger.error("Failed to merge page content: %s", e)
-            return existing_content + "\n\n" + new_info
+        return merge_content(existing_content, new_info)
 
     def ingest(
         self,

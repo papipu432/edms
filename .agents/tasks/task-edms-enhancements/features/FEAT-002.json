@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "refactor",
   "description": "Replace raw OpenAI SDK usage in app/core/llm.py with LangChain for LLM orchestration. Migrate summarization, keyword extraction, embeddings, and RAG chat to use LangChain chains, prompt templates, and embedding models. Add scanner service with pytwain and pyinsane2 support.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add new dependencies via 'uv add': langchain, langchain-openai, langchain-core, pytwain, pyinsane2. Run 'uv sync'. Note: pytwain and pyinsane2 are platform-specific (Windows/Linux) so they may only install as stubs - that's fine for the interface.",
     "Rewrite app/core/llm.py to use LangChain: Replace get_llm_client() with get_chat_model() that returns a ChatOpenAI instance (or None if no key). Replace generate_summary() to use a LangChain chain: ChatPromptTemplate.from_messages() with system/human templates piped to the chat model via LCEL (prompt | model | StrOutputParser). Replace extract_keywords() similarly with a chain that parses comma-separated output. Replace generate_embeddings() to use langchain_openai.OpenAIEmbeddings with embed_documents(). Replace chat_completion() to use a chain with system prompt containing RAG context. Keep the same function signatures and return types so callers (pipeline.py, search.py, wiki.py) don't need changes. Keep the same fallback behavior (return placeholders when no API key).",
