@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Add Role-Based Access Control (RBAC) system with JWT authentication, user management, role-based permissions, and document folder assignment. Roles: admin, reviewer, editor, annotator, approver.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add dependencies via 'uv add': python-jose[cryptography], passlib[bcrypt], pyjwt. Run 'uv sync'.",
     "Create app/models/user.py: Define User model (id, username, email, hashed_password, is_active, created_at, updated_at) and Role model (id, name as enum: admin/reviewer/editor/annotator/approver, description). Define UserRole association table (user_id, role_id). Define FolderAssignment model (id, user_id, folder_path, role_id, granted_at). All models inherit from the existing Base in app/models/group.py. Add relationships: User.roles -> list[Role], User.folder_assignments -> list[FolderAssignment].",
@@ -35,5 +35,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "bcrypt 5.x is incompatible with passlib; pinned bcrypt==4.0.1 to resolve. All 146 tests pass (131 existing + 15 new). Lint passes cleanly."
 }
