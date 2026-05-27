@@ -13,6 +13,19 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ALGORITHM: str = "HS256"
 
+    # LDAP settings
+    LDAP_ENABLED: bool = False
+    LDAP_SERVER: str = "ldap://localhost"
+    LDAP_PORT: int = 389
+    LDAP_BASE_DN: str = "dc=example,dc=com"
+    LDAP_BIND_DN: str = ""
+    LDAP_BIND_PASSWORD: str = ""
+
+    # Bootstrap admin
+    BOOTSTRAP_ADMIN_USERNAME: str = "admin"
+    BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
+    BOOTSTRAP_ADMIN_EMAIL: str = "admin@edms.local"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

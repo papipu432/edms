@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Users - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Users</h1>
+<div id="users-list" class="bg-white rounded shadow p-4">
+    <p class="text-gray-500">Loading...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+authFetch('/api/users').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('users-list');
+    if(!data.length){el.innerHTML='<p>No users.</p>';return;}
+    el.innerHTML='<table class="w-full"><thead><tr><th class="text-left p-2">Username</th><th class="text-left p-2">Email</th><th class="text-left p-2">Active</th><th class="text-left p-2">Roles</th></tr></thead><tbody>'+data.map(u=>'<tr><td class="p-2">'+escapeHtml(u.username)+'</td><td class="p-2">'+escapeHtml(u.email)+'</td><td class="p-2">'+(u.is_active?'Yes':'No')+'</td><td class="p-2">'+escapeHtml(u.roles.join(', '))+'</td></tr>').join('')+'</tbody></table>';
+});
+</script>
+{% endblock %}

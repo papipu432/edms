@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}User Form - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">User Form</h1>
+<div class="bg-white rounded shadow p-6 max-w-lg">
+    <form id="user-form">
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Username</label>
+            <input type="text" name="username" class="w-full border rounded p-2" required>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Email</label>
+            <input type="email" name="email" class="w-full border rounded p-2" required>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Password</label>
+            <input type="password" name="password" class="w-full border rounded p-2" required>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Create User</button>
+    </form>
+</div>
+{% endblock %}

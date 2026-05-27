@@ -3,14 +3,24 @@ import pytest_asyncio
 from httpx import AsyncClient
 
 from app.core.security import create_access_token, hash_password
-from app.models.user import Role, RoleName, User
+from app.models.user import Role, User, UserRole
 
 
 @pytest_asyncio.fixture
 async def seeded_db(db_session):
     """Seed roles into the test database."""
-    for role_name in RoleName:
-        db_session.add(Role(name=role_name, description=f"{role_name.value} role"))
+    roles_data = [
+        ("admin", "Administrator"),
+        ("reviewer", "Reviewer"),
+        ("editor", "Editor"),
+        ("annotator", "Annotator"),
+        ("approver", "Approver"),
+        ("manager", "Manager"),
+        ("operator", "Operator"),
+        ("viewer", "Viewer"),
+    ]
+    for code, name in roles_data:
+        db_session.add(Role(code=code, name=name, description=f"{code} role", is_system=True))
     await db_session.flush()
     return db_session
 
@@ -20,16 +30,21 @@ async def admin_user(seeded_db):
     """Create an admin user in the test database."""
     from sqlalchemy import select
 
-    result = await seeded_db.execute(select(Role).where(Role.name == RoleName.admin))
+    result = await seeded_db.execute(select(Role).where(Role.code == "admin"))
     admin_role = result.scalar_one()
 
     user = User(
         username="admin",
         email="admin@edms.local",
+        display_name="Admin",
         hashed_password=hash_password("admin"),
     )
-    user.roles.append(admin_role)
     seeded_db.add(user)
+    await seeded_db.flush()
+    await seeded_db.refresh(user)
+
+    user_role = UserRole(user_id=user.id, role_id=admin_role.id)
+    seeded_db.add(user_role)
     await seeded_db.flush()
     await seeded_db.refresh(user)
     return user
@@ -47,6 +62,7 @@ async def regular_user(seeded_db):
     user = User(
         username="regular",
         email="regular@edms.local",
+        display_name="Regular",
         hashed_password=hash_password("password123"),
     )
     seeded_db.add(user)

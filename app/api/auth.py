@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,10 +16,16 @@ from app.core.security import (
 from app.models.user import User
 from app.schemas.user import LoginRequest, Token, UserCreate, UserResponse
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
+templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+# ── API Endpoints (Bearer token) ──────────────────────────────────────────────
+
+
+@router.post(
+    "/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     # Check if username or email already exists
     result = await db.execute(
@@ -33,6 +43,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     user = User(
         username=user_data.username,
         email=user_data.email,
+        display_name=user_data.username,
         hashed_password=hash_password(user_data.password),
     )
     db.add(user)
@@ -42,21 +53,23 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     return UserResponse(
         id=user.id,
         username=user.username,
-        email=user.email,
+        email=user.email or "",
         is_active=user.is_active,
-        roles=[r.name.value for r in user.roles],
+        roles=user.role_codes,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
 
 
-@router.post("/login", response_model=Token)
+@router.post("/api/auth/login", response_model=Token)
 async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(User).where(User.username == login_data.username)
     )
     user = result.scalar_one_or_none()
-    if user is None or not verify_password(login_data.password, user.hashed_password):
+    if user is None or not user.hashed_password or not verify_password(
+        login_data.password, user.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -71,14 +84,64 @@ async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
     return Token(access_token=access_token)
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/api/auth/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
-        email=current_user.email,
+        email=current_user.email or "",
         is_active=current_user.is_active,
-        roles=[r.name.value for r in current_user.roles],
+        roles=current_user.role_codes,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
+    )
+
+
+# ── Session Cookie Endpoints (HTML form) ──────────────────────────────────────
+
+
+@router.post("/auth/login")
+async def html_login(request: Request, db: AsyncSession = Depends(get_db)):
+    """HTML form login - sets session cookie."""
+    form = await request.form()
+    username = form.get("username", "")
+    password = form.get("password", "")
+
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if user is None or not user.hashed_password or not verify_password(
+        str(password), user.hashed_password
+    ):
+        return templates.TemplateResponse(
+            request, "login.html", {"error": "Invalid credentials"}, status_code=401
+        )
+    if not user.is_active:
+        return templates.TemplateResponse(
+            request, "login.html", {"error": "User is inactive"}, status_code=401
+        )
+
+    access_token = create_access_token(data={"sub": user.username})
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(key="access_token", value=access_token, httponly=True)
+    return response
+
+
+@router.get("/auth/logout")
+async def html_logout():
+    """Clear session cookie and redirect to login."""
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(key="access_token")
+    return response
+
+
+@router.get("/auth/profile")
+async def profile_page(request: Request, user: User = Depends(get_current_user)):
+    return templates.TemplateResponse(
+        request,
+        "auth/profile.html",
+        {
+            "user": user,
+            "roles": user.role_codes,
+            "permissions": user.permissions,
+        },
     )

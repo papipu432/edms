@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Org Structure - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Organization Structure</h1>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="/org/units" class="bg-white p-6 rounded shadow hover:shadow-md">
+        <h2 class="text-lg font-semibold">Units</h2>
+        <p class="text-gray-600">Manage organizational units</p>
+    </a>
+    <a href="/org/positions" class="bg-white p-6 rounded shadow hover:shadow-md">
+        <h2 class="text-lg font-semibold">Positions</h2>
+        <p class="text-gray-600">Manage positions</p>
+    </a>
+    <a href="/org/grades" class="bg-white p-6 rounded shadow hover:shadow-md">
+        <h2 class="text-lg font-semibold">Grades</h2>
+        <p class="text-gray-600">Manage grade levels</p>
+    </a>
+    <a href="/org/assignments" class="bg-white p-6 rounded shadow hover:shadow-md">
+        <h2 class="text-lg font-semibold">Assignments</h2>
+        <p class="text-gray-600">User assignments</p>
+    </a>
+    <a href="/org/chart" class="bg-white p-6 rounded shadow hover:shadow-md">
+        <h2 class="text-lg font-semibold">Org Chart</h2>
+        <p class="text-gray-600">Visual org chart</p>
+    </a>
+    <a href="/org/history" class="bg-white p-6 rounded shadow hover:shadow-md">
+        <h2 class="text-lg font-semibold">History</h2>
+        <p class="text-gray-600">Change audit trail</p>
+    </a>
+</div>
+{% endblock %}

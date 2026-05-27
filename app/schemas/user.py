@@ -10,13 +10,13 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     username: str
     email: str
     is_active: bool
     roles: list[str] = []
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -37,7 +37,7 @@ class FolderAssignmentCreate(BaseModel):
 
 class FolderAssignmentResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: str
     folder_path: str
     role_name: str
     granted_at: datetime

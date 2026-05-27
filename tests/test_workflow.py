@@ -6,36 +6,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import create_access_token, hash_password
 from app.models.document import Document, DocumentStatus
 from app.models.group import Group
-from app.models.user import Role, RoleName, User
+from app.models.user import Role, User, UserRole
+
+
+# Map old enum values to role codes for convenience
+class RoleName:
+    admin = "admin"
+    reviewer = "reviewer"
+    editor = "editor"
+    annotator = "annotator"
+    approver = "approver"
 
 
 async def _create_user_with_roles(
-    db: AsyncSession, roles: list[RoleName] | None = None
+    db: AsyncSession, roles: list[str] | None = None
 ) -> tuple[User, str]:
     """Helper to create a user with specified roles and return (user, token)."""
     # Ensure role records exist
     if roles:
-        for role_name in roles:
-            existing = await db.execute(select(Role).where(Role.name == role_name))
+        for role_code in roles:
+            existing = await db.execute(select(Role).where(Role.code == role_code))
             if existing.scalar_one_or_none() is None:
-                db.add(Role(name=role_name, description=f"{role_name.value} role"))
+                db.add(Role(code=role_code, name=role_code.title(), description=f"{role_code} role", is_system=True))
         await db.flush()
 
     user = User(
         username="testuser",
         email="test@example.com",
+        display_name="Test User",
         hashed_password=hash_password("password123"),
     )
-
-    if roles:
-        for role_name in roles:
-            result = await db.execute(select(Role).where(Role.name == role_name))
-            role = result.scalar_one()
-            user.roles.append(role)
-
     db.add(user)
     await db.flush()
     await db.refresh(user)
+
+    if roles:
+        for role_code in roles:
+            result = await db.execute(select(Role).where(Role.code == role_code))
+            role = result.scalar_one()
+            user_role = UserRole(user_id=user.id, role_id=role.id)
+            db.add(user_role)
+        await db.flush()
+        await db.refresh(user)
+
     token = create_access_token(data={"sub": user.username})
     return user, token
 

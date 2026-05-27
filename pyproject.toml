@@ -35,6 +35,12 @@ dependencies = [
     "uvicorn[standard]>=0.48.0",
 ]
 
+[project.optional-dependencies]
+ldap = [
+    "ldap3>=2.9.1",
+    "pycryptodome>=3.20.0",
+]
+
 # Note: marker-pdf and docling have version conflicts with pillow>=12.
 # They cannot be installed in the current environment but the code handles
 # their absence gracefully via try/except imports. Install them manually

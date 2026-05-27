@@ -10,7 +10,7 @@ class WorkflowActionRequest(BaseModel):
 class WorkflowEntryResponse(BaseModel):
     id: int
     document_id: int
-    user_id: int
+    user_id: str
     action: str
     comment: str | None = None
     created_at: datetime

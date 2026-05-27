@@ -34,7 +34,7 @@ async def create_workflow_action(
 ):
     # Check role permissions for the requested action
     allowed_roles = _ACTION_ALLOWED_ROLES.get(action, [])
-    user_roles = [r.name.value for r in current_user.roles]
+    user_roles = current_user.role_codes
     if not any(role in user_roles for role in allowed_roles):
         raise HTTPException(
             status_code=403,

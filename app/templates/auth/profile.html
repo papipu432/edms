@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Profile - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">My Profile</h1>
+<div class="bg-white rounded shadow p-6 max-w-lg">
+    <div class="mb-4">
+        <label class="text-sm text-gray-500">Username</label>
+        <p class="font-medium">{{ user.username }}</p>
+    </div>
+    <div class="mb-4">
+        <label class="text-sm text-gray-500">Display Name</label>
+        <p class="font-medium">{{ user.display_name }}</p>
+    </div>
+    <div class="mb-4">
+        <label class="text-sm text-gray-500">Email</label>
+        <p class="font-medium">{{ user.email or 'Not set' }}</p>
+    </div>
+    <div class="mb-4">
+        <label class="text-sm text-gray-500">Roles</label>
+        <p class="font-medium">{{ roles | join(', ') if roles else 'None' }}</p>
+    </div>
+    <div class="mb-4">
+        <label class="text-sm text-gray-500">Permissions</label>
+        <ul class="text-sm text-gray-700">
+            {% for p in permissions %}
+            <li>{{ p }}</li>
+            {% else %}
+            <li>No explicit permissions (admin has all)</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

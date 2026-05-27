@@ -12,7 +12,7 @@ class AnnotationCreate(BaseModel):
 class AnnotationResponse(BaseModel):
     id: int
     document_id: int
-    user_id: int
+    user_id: str
     text: str
     start_offset: int | None = None
     end_offset: int | None = None
