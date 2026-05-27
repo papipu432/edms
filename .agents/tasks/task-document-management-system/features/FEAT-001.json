@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Project scaffolding, FastAPI application with document groups/folders CRUD, document upload with encrypted PDF storage, and SQLite database setup. This establishes the core web application, file storage, and database layer.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Initialize project with pyproject.toml using 'uv init' in /projects/sandbox/edms. Set Python version to 3.11 via .python-version file. Add dependencies: fastapi, uvicorn[standard], sqlalchemy[asyncio], aiosqlite, python-multipart, pikepdf, pydantic-settings, alembic, httpx (dev).",
     "Create app/ package structure: app/__init__.py, app/main.py (FastAPI app factory with lifespan for DB init), app/core/__init__.py, app/core/config.py (Settings via pydantic-settings: DATABASE_URL, STORAGE_PATH, WIKI_PATH, PDF_ENCRYPTION_PASSWORD, OPENAI_API_KEY, CHUNK_SIZE), app/core/database.py (async SQLAlchemy engine + sessionmaker + get_db dependency).",
@@ -30,5 +30,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 13 tests pass. Ruff lint passes cleanly. pytest-asyncio 1.4.0 installed with asyncio_mode=auto in pyproject.toml. Used in-memory SQLite for tests with dependency override. The uv init generated a main.py at root which was removed (app/main.py is the real entry point). Storage service uses pikepdf R=6 encryption. The sample PDF fixture is generated programmatically as minimal valid PDF bytes."
 }
