@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Orphaned Lifecycle Monitoring Dashboard - Detect documents with expired lifecycles, broken reviewer assignments, empty groups. HTML dashboard with recommended actions. Scheduled daily health check with email digest.",
+  "status": "pending",
+  "steps": [
+    "Step 1: Create app/services/health_monitor.py with HealthMonitorService class implementing: detect_expired_lifecycles(db) -> documents past expiry with no renewal, detect_broken_reviewers(db) -> lifecycles assigned to deleted/deactivated users, detect_empty_groups(db) -> groups with no active users, detect_stale_documents(db) -> documents stuck in 'processing' status for >24h, run_full_health_check(db) -> aggregates all checks into a HealthReport dataclass.",
+    "Step 2: Create app/schemas/health.py with Pydantic schemas: HealthIssue(issue_type, severity, document_id, document_name, detail, recommended_action), HealthReport(issues: list[HealthIssue], checked_at: datetime, summary: dict with counts per issue_type), HealthDigest(report: HealthReport, sent_to: list[str]).",
+    "Step 3: Create app/api/health_dashboard.py with endpoints: GET /api/health/check (run health check and return report), GET /api/health/dashboard (return HTML dashboard page), POST /api/health/send-digest (trigger email digest to admins). The dashboard HTML should be at app/templates/health_dashboard.html showing issues grouped by type with severity indicators and recommended actions.",
+    "Step 4: Create app/templates/health_dashboard.html - a styled HTML page (following the pattern of existing templates like settings_security.html) showing: summary cards (count of each issue type), detailed table of issues with columns (Document, Issue Type, Severity, Detail, Recommended Action), and a button to send digest email.",
+    "Step 5: Update app/services/email_notifications.py to add send_health_digest(report, recipients) method that formats the HealthReport into an HTML email and sends to all admin users.",
+    "Step 6: Register the health dashboard router in app/api/router.py.",
+    "Step 7: Create tests/test_health_monitor.py with tests: detect expired lifecycle (create lifecycle with past expiry date), detect broken reviewer (assign reviewer then delete user), detect empty group, full health check aggregation, digest email formatting."
+  ],
+  "acceptance_criteria": [
+    "Health check detects expired lifecycles, broken reviewers, and empty groups",
+    "Dashboard HTML renders with grouped issues and severity indicators",
+    "Email digest sends formatted report to admin users",
+    "API endpoint returns structured HealthReport",
+    "Tests pass: uv run pytest tests/test_health_monitor.py -v"
+  ],
+  "verification": [
+    "uv run pytest tests/test_health_monitor.py -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

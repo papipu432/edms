@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     BACKUP_SCHEDULE: str = "0 2 * * *"
     BACKUP_RETENTION_DAYS: int = 30
 
+    # KMS settings
+    KMS_PROVIDER: str = "local"  # "local", "vault", or "cosmian"
+    KMS_LOCAL_PASSPHRASE: str = "changeme-kms-passphrase"
+    KMS_VAULT_URL: str = ""
+    KMS_VAULT_TOKEN: str = ""
+
     # Bootstrap admin
     BOOTSTRAP_ADMIN_USERNAME: str = "admin"
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"

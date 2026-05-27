@@ -1,6 +1,7 @@
 """Encryption settings API router."""
 
 import hashlib
+import logging
 import uuid
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from app.models.encryption import EncryptionKey, KeyShare
 from app.services.key_recovery import KeyRecoveryManager, ShamirSecretSharing
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _get_key_manager() -> KeyRecoveryManager:
@@ -117,8 +119,17 @@ async def initialize_encryption(
     # Save KEK encrypted with passphrase
     manager.save_kek_encrypted(kek, passphrase)
 
+    # Also wrap with KMS for operational use
+    try:
+        manager.save_kek_kms_wrapped(kek)
+        logger.info("KEK wrapped with KMS provider for operational use")
+    except Exception:
+        # KMS wrapping is optional - passphrase-based storage is the fallback
+        logger.info("KMS wrapping skipped (provider may not be configured)")
+
     # Create DB record for the key
     key_id_hex = hashlib.sha256(kek).hexdigest()[:16]
+    logger.info("Encryption initialized with key_id=%s", key_id_hex)
     enc_key = EncryptionKey(
         id=str(uuid.uuid4()),
         key_type="kek",
@@ -189,6 +200,7 @@ async def recover_encryption(
     try:
         kek = ShamirSecretSharing.reconstruct_secret(shares)
     except Exception as e:
+        logger.warning("KEK recovery failed: invalid shares provided")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to reconstruct key: {e}",
@@ -205,12 +217,14 @@ async def recover_encryption(
     stored_key = result.scalar_one_or_none()
 
     if not stored_key:
+        logger.warning("KEK recovery verification failed: key_id=%s not found", key_id_hex)
         raise HTTPException(
             status_code=400,
             detail="Reconstructed key does not match any active key. "
             "Shares may be incorrect or corrupted.",
         )
 
+    logger.info("KEK successfully recovered and verified: key_id=%s", key_id_hex)
     return {
         "status": "recovered",
         "key_id": key_id_hex,

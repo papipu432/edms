@@ -5,10 +5,13 @@ File format:
     DATA_NONCE(12) | DATA_TAG(16) | CIPHERTEXT(...)
 """
 
+import logging
 from pathlib import Path
 
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
+
+logger = logging.getLogger(__name__)
 
 MAGIC = b"EDMS"
 VERSION = 1
@@ -19,6 +22,24 @@ VERSION_SIZE = 4
 NONCE_SIZE = 12
 TAG_SIZE = 16
 DEK_SIZE = 32
+
+
+def get_production_kek(wrapped_kek_blob: bytes) -> bytes:
+    """Retrieve the production KEK by unwrapping it via the KMS provider.
+
+    The KEK is only held in memory during active encrypt/decrypt operations
+    and should not be stored or logged.
+
+    Args:
+        wrapped_kek_blob: The KMS-wrapped KEK blob from storage.
+
+    Returns:
+        The raw KEK bytes for use in envelope encryption.
+    """
+    from app.services.kms import get_kms_provider
+
+    kms = get_kms_provider()
+    return kms.unwrap_key(wrapped_kek_blob)
 
 
 class EnvelopeEncryption:

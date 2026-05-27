@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Integer, LargeBinary, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.group import Base
@@ -65,4 +65,29 @@ class BackupConfig(Base):
     config_value: Mapped[str] = mapped_column(Text, nullable=False, default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class BackupEncryptionKey(Base):
+    """Stores the KMS-wrapped backup KEK, separate from production KEK."""
+
+    __tablename__ = "backup_encryption_keys"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=_gen_uuid
+    )
+    key_id_hex: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False
+    )
+    wrapped_key_blob: Mapped[bytes] = mapped_column(
+        LargeBinary, nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    purpose: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="backup"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
     )

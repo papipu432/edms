@@ -136,7 +136,7 @@ async def test_update_backup_config(client: AsyncClient, admin_token: str):
     )
     data = resp.json()
     assert data["minio_primary_endpoint"] == "minio.test.local:9000"
-    assert data["minio_primary_access_key"] == "testaccesskey"
+    assert data["minio_primary_access_key"] == "***"
     assert data["minio_primary_bucket"] == "test-bucket"
     assert data["backup_retention_days"] == 60
 

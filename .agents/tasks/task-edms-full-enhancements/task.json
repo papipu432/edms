@@ -1,0 +1,7 @@
+{
+  "task_id": "task-edms-full-enhancements",
+  "task_description": "Comprehensive EDMS enhancements: security hardening (KMS abstraction, backup KEK isolation, raw key protection), first-time setup wizard (CLI + web), document relationship management, orphaned lifecycle monitoring dashboard, Obsidian vault export, enhanced search UX, improved chat with persistence, and real-time WebSocket notifications.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006", "FEAT-007", "FEAT-008"],
+  "blocked_reason": null
+}

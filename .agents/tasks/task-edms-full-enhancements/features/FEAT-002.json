@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "First-Time Setup Wizard - CLI and Web-based initialization wizard that handles environment configuration, database setup, admin creation, KEK generation with Shamir shares, storage directory creation, LLM provider selection, and all service configuration. Runnable via 'python -m app.setup_wizard' and accessible as HTML page on first launch.",
+  "status": "pending",
+  "steps": [
+    "Step 1: Create app/setup_wizard/__init__.py and app/setup_wizard/__main__.py as the CLI entry point. The __main__.py should parse args and run the wizard interactively in the terminal. Create app/setup_wizard/core.py with the shared wizard logic that both CLI and web use.",
+    "Step 2: In app/setup_wizard/core.py, implement the following wizard steps as callable functions: (a) generate_env_file() - creates .env with all settings from user input, (b) test_postgres_connection(url) - tests DB connectivity, (c) run_migrations() - creates schema using SQLAlchemy Base.metadata.create_all, (d) create_admin_user(username, password, email) - creates the bootstrap admin, (e) generate_kek_with_shares(threshold, num_shares) - generates KEK, splits via Shamir, returns shares for display (never stores assembled key), (f) configure_storage() - creates all data directories (data/raw, data/md, data/csv, data/images, data/vectors, uploads/), (g) configure_minio(endpoint, access_key, secret_key, bucket) - tests MinIO connection, (h) configure_llm(provider, api_key_or_url, models) - validates LLM config, (i) configure_chromadb(path_or_host) - initializes ChromaDB, (j) configure_smtp(host, port, user, password, from_email) - tests SMTP connection, (k) configure_security(encryption_password, jwt_secret) - sets security params.",
+    "Step 3: Implement the CLI wizard in app/setup_wizard/__main__.py using input() prompts. It should walk through each step sequentially, display Shamir shares to the admin (with WARNING that shares are shown only once), and write the .env file at the end. Support --non-interactive flag with env vars for CI/automation.",
+    "Step 4: Create app/setup_wizard/web.py with a FastAPI sub-application (or router) that serves an HTML setup wizard. Create app/templates/setup_wizard.html as a multi-step form (single page with JS steps). The web wizard should: detect if setup is needed (no .env or no DB tables), present each configuration step, display Shamir shares in a modal with copy buttons, and redirect to login after completion.",
+    "Step 5: Update app/main.py to detect first-launch condition (check if .env exists and DB is configured). If not configured, mount the setup wizard web routes and redirect all other routes to the wizard. After setup completes, the normal app routes should work.",
+    "Step 6: Create tests/test_setup_wizard.py that tests: env file generation (writes correct keys), storage directory creation, KEK generation returns valid shares, admin user creation works, the detection logic for first-launch condition. Mock external services (PostgreSQL, MinIO, SMTP) for testing."
+  ],
+  "acceptance_criteria": [
+    "Running 'uv run python -m app.setup_wizard --help' shows usage information",
+    "The setup wizard core functions are independently testable",
+    "Web wizard HTML page renders correctly when setup is needed",
+    "Shamir shares are displayed but never stored assembled",
+    "All required directories are created by configure_storage()",
+    "Tests pass: uv run pytest tests/test_setup_wizard.py -v",
+    "Existing tests still pass: uv run pytest tests/ -v"
+  ],
+  "verification": [
+    "uv run pytest tests/test_setup_wizard.py -v",
+    "uv run python -m app.setup_wizard --help"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

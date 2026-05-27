@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Security Hardening - KMS Abstraction Layer + Backup KEK Isolation + Raw Key Protection. Create a KMS provider abstraction (local file-based, HashiCorp Vault, Cosmian KMS). Ensure backup uses a separate KEK from production encryption. Audit all code paths to ensure no raw key material is logged, stored in DB, or transmitted over network. Update encryption service, key_recovery, backup service to use KMS layer.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1: Create app/services/kms.py with a KMSProvider abstract base class and three implementations: LocalFileKMS (wraps keys via a root secret derived from passphrase using scrypt), VaultKMS (interface for HashiCorp Vault transit engine), CosmianKMS (interface stub). The KMS should support: wrap_key(plaintext_key) -> wrapped_blob, unwrap_key(wrapped_blob) -> plaintext_key, generate_key() -> wrapped_blob. Add KMS_PROVIDER, KMS_VAULT_URL, KMS_VAULT_TOKEN, KMS_LOCAL_PASSPHRASE to app/core/config.py.",
+    "Step 2: Create app/services/backup_kek_manager.py that manages a separate KEK hierarchy for backup encryption. It must: use its own KMS-wrapped KEK distinct from the production KEK, store backup KEK metadata in a separate DB table (backup_encryption_keys), provide encrypt_for_backup(data) and decrypt_from_backup(data) methods that use the backup-specific KEK. Add the BackupEncryptionKey model to app/models/backup.py.",
+    "Step 3: Update app/services/backup.py to use the backup KEK manager for encrypting backup data before sending to restic/MinIO. Add a pre-backup encryption step that wraps the backup payload with the backup-specific KEK. Ensure backup credentials (MINIO keys, RESTIC_PASSWORD) are never logged.",
+    "Step 4: Update app/services/encryption.py to accept KEK via KMS unwrap rather than raw bytes. Add a get_production_kek() function that retrieves the wrapped KEK from storage and unwraps via KMS. Ensure DEK is still generated per-file and zeroized after use. The KEK should only exist in memory during active encrypt/decrypt operations.",
+    "Step 5: Update app/services/key_recovery.py to store KEK wrapped by KMS rather than directly encrypted with passphrase. The Shamir shares still split the raw KEK for break-glass recovery, but the operational KEK is always stored KMS-wrapped. Add a ceremony_required flag that prevents automatic recovery without human approval.",
+    "Step 6: Audit app/api/settings_encryption.py to ensure the /init endpoint never returns raw KEK material in response. Currently it returns share_hex which is correct (shares are meant to be displayed once). Verify the /recover endpoint does not return the recovered KEK bytes - it should only confirm success. Add redaction to any logging statements that might contain key material.",
+    "Step 7: Update app/api/settings_backup.py to mask all secret values in GET responses (already partially done with '***'). Ensure POST endpoints don't log the incoming secret values. Add input validation.",
+    "Step 8: Create tests/test_kms.py with tests for the KMS abstraction layer (LocalFileKMS wrap/unwrap roundtrip, key generation, wrong passphrase failure). Create tests/test_backup_kek.py for backup KEK isolation. Create tests/test_security_hardening.py that verifies no raw keys appear in API responses and that backup/production KEKs are distinct."
+  ],
+  "acceptance_criteria": [
+    "KMS abstraction exists with LocalFileKMS fully functional",
+    "Backup encryption uses a separate KEK from production encryption (different key IDs in DB)",
+    "No raw key material appears in any API response body",
+    "No raw key material is written to logs (grep for key patterns in logging statements)",
+    "Key recovery requires explicit ceremony (Shamir shares) and cannot auto-export",
+    "All new tests pass: uv run pytest tests/test_kms.py tests/test_backup_kek.py tests/test_security_hardening.py -v",
+    "Existing encryption tests still pass: uv run pytest tests/test_encryption.py -v"
+  ],
+  "verification": [
+    "uv run pytest tests/test_kms.py tests/test_backup_kek.py tests/test_security_hardening.py tests/test_encryption.py -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

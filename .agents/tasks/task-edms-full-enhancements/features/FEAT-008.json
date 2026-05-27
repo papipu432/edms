@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-008",
+  "type": "feat",
+  "description": "Real-time Notifications via WebSocket - WebSocket endpoint for live notifications including document status changes, lifecycle alerts, ransomware detection alerts, and backup completion/failure notifications. Notification persistence and read status tracking.",
+  "status": "pending",
+  "steps": [
+    "Step 1: Create app/models/notification.py with Notification model: id, user_id (FK, nullable for broadcast), notification_type (enum: document_status, lifecycle_alert, ransomware_alert, backup_status, system), title, message, data_json (extra payload), is_read (bool default False), created_at. Add NotificationType enum.",
+    "Step 2: Create app/services/notifications.py with NotificationManager class (singleton): manage active WebSocket connections per user_id, broadcast(notification) -> sends to all connected clients, send_to_user(user_id, notification) -> sends to specific user's connections, notify_document_status(doc_id, status) -> creates notification and broadcasts, notify_lifecycle_alert(lifecycle_id, alert_type) -> creates and sends to assigned reviewer, notify_ransomware_alert(alert_data) -> broadcasts to all admins, notify_backup_status(job_id, status) -> sends to admins. Persist all notifications to DB before sending via WebSocket.",
+    "Step 3: Create app/api/websocket.py with: WebSocket endpoint at /ws/notifications that authenticates via token query param (validate JWT), registers connection with NotificationManager, sends real-time notifications as JSON, handles ping/pong for keepalive. Also add REST endpoints: GET /api/notifications (list user's notifications with pagination), POST /api/notifications/{id}/read (mark as read), POST /api/notifications/read-all (mark all as read), GET /api/notifications/unread-count (count of unread).",
+    "Step 4: Integrate notification triggers into existing services: Update app/api/documents.py to call notify_document_status() when document processing completes or fails. Update app/services/ransomware_detector.py alert callback to call notify_ransomware_alert(). Update app/api/settings_backup.py _run_backup_task to call notify_backup_status(). Update app/services/lifecycle.py to call notify_lifecycle_alert() on state transitions.",
+    "Step 5: Register the websocket/notifications router in app/api/router.py.",
+    "Step 6: Create tests/test_notifications.py with tests: WebSocket connection with valid token, notification persistence to DB, REST endpoint lists user notifications, mark as read, unread count, document status notification creation, broadcast sends to all connected clients, invalid token rejected on WebSocket."
+  ],
+  "acceptance_criteria": [
+    "WebSocket endpoint authenticates users and maintains connections",
+    "Notifications are persisted to database before WebSocket delivery",
+    "Document status changes trigger real-time notifications",
+    "Ransomware alerts broadcast to admin users",
+    "Backup status notifications sent on completion/failure",
+    "REST API provides notification history with read/unread tracking",
+    "Tests pass: uv run pytest tests/test_notifications.py -v"
+  ],
+  "verification": [
+    "uv run pytest tests/test_notifications.py -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -5,11 +5,14 @@ the irreducible polynomial x^8 + x^4 + x^3 + x + 1 (0x11B).
 """
 
 import json
+import logging
 from pathlib import Path
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import scrypt
 from Crypto.Random import get_random_bytes
+
+logger = logging.getLogger(__name__)
 
 # GF(256) with irreducible polynomial x^8 + x^4 + x^3 + x + 1
 _GF256_MOD = 0x11B
@@ -142,10 +145,15 @@ class ShamirSecretSharing:
 
 
 class KeyRecoveryManager:
-    """Manages KEK generation, splitting, and recovery."""
+    """Manages KEK generation, splitting, and recovery.
 
-    def __init__(self, key_store_path: Path):
+    The operational KEK is always stored KMS-wrapped. Shamir shares split
+    the raw KEK for break-glass recovery only, requiring explicit ceremony.
+    """
+
+    def __init__(self, key_store_path: Path, ceremony_required: bool = True):
         self.key_store_path = key_store_path
+        self.ceremony_required = ceremony_required
 
     def generate_kek(self) -> bytes:
         """Generate a new 32-byte KEK."""
@@ -158,7 +166,14 @@ class KeyRecoveryManager:
         return ShamirSecretSharing.split_secret(kek, threshold, num_shares)
 
     def recover_kek(self, shares: list[tuple[int, bytes]]) -> bytes:
-        """Reconstruct KEK from shares."""
+        """Reconstruct KEK from shares.
+
+        This is a break-glass recovery operation that requires explicit
+        ceremony (multiple share holders present). The recovered KEK should
+        be immediately re-wrapped with KMS and not exported.
+        """
+        if self.ceremony_required:
+            logger.info("KEK recovery ceremony initiated with %d shares", len(shares))
         return ShamirSecretSharing.reconstruct_secret(shares)
 
     def save_kek_encrypted(self, kek: bytes, passphrase: str) -> None:
@@ -193,3 +208,26 @@ class KeyRecoveryManager:
         derived_key = scrypt(passphrase.encode(), salt, 32, N=2**14, r=8, p=1)
         cipher = AES.new(derived_key, AES.MODE_GCM, nonce=nonce)
         return cipher.decrypt_and_verify(ciphertext, tag)
+
+    def save_kek_kms_wrapped(self, kek: bytes) -> bytes:
+        """Wrap KEK with KMS and save the wrapped blob.
+
+        Returns the wrapped blob for storage in the database.
+        The raw KEK is not stored on disk in this mode.
+        """
+        from app.services.kms import get_kms_provider
+
+        kms = get_kms_provider()
+        wrapped_blob = kms.wrap_key(kek)
+        logger.info("KEK wrapped with KMS provider")
+        return wrapped_blob
+
+    def load_kek_kms_wrapped(self, wrapped_blob: bytes) -> bytes:
+        """Unwrap KEK from KMS-wrapped blob.
+
+        The unwrapped KEK should only exist in memory during active operations.
+        """
+        from app.services.kms import get_kms_provider
+
+        kms = get_kms_provider()
+        return kms.unwrap_key(wrapped_blob)

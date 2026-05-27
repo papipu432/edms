@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Document Relationship Management - Cross-reference graph between documents with relationship types (parent, child, related, supersedes, references). Orphaned document detection, relationship visualization API returning graph data, and dependency tracking.",
+  "status": "pending",
+  "steps": [
+    "Step 1: Create app/models/relationship.py with a DocumentRelationship model: id, source_document_id (FK to documents.id), target_document_id (FK to documents.id), relationship_type (enum: parent, child, related, supersedes, references), description (optional text), created_by (FK to users.id), created_at. Add a unique constraint on (source_document_id, target_document_id, relationship_type).",
+    "Step 2: Create app/schemas/relationship.py with Pydantic schemas: RelationshipCreate(source_document_id, target_document_id, relationship_type, description), RelationshipResponse(id, source_document_id, target_document_id, relationship_type, description, created_by, created_at), RelationshipGraphResponse(nodes: list of {id, name, group_id}, edges: list of {source, target, type}), OrphanedDocumentResponse(document_id, document_name, issue: str).",
+    "Step 3: Create app/services/relationships.py with RelationshipService class: add_relationship(), remove_relationship(), get_document_relationships(doc_id) -> list, get_relationship_graph(group_id=None) -> graph data for visualization, detect_orphaned_documents() -> documents with broken relationships (target deleted), get_document_dependencies(doc_id) -> transitive dependency tree.",
+    "Step 4: Create app/api/relationships.py with endpoints: POST /api/documents/{id}/relationships (create relationship), GET /api/documents/{id}/relationships (list relationships for a document), DELETE /api/relationships/{id} (remove relationship), GET /api/relationships/graph (full graph or filtered by group_id), GET /api/relationships/orphaned (detect orphaned documents), GET /api/documents/{id}/dependencies (dependency tree).",
+    "Step 5: Register the relationships router in app/api/router.py.",
+    "Step 6: Create tests/test_relationships.py with tests: create relationship, list relationships, detect orphans after document deletion, graph generation returns correct nodes/edges, dependency tree traversal, prevent duplicate relationships, prevent self-referencing relationships."
+  ],
+  "acceptance_criteria": [
+    "Can create relationships between documents with typed connections",
+    "Orphaned document detection finds documents with broken relationship targets",
+    "Graph API returns nodes and edges suitable for frontend visualization",
+    "Dependency tracking returns transitive dependencies",
+    "Duplicate and self-referencing relationships are rejected",
+    "Tests pass: uv run pytest tests/test_relationships.py -v"
+  ],
+  "verification": [
+    "uv run pytest tests/test_relationships.py -v"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

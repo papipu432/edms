@@ -1,10 +1,13 @@
 import asyncio
+import logging
 import shutil
 from datetime import datetime, timezone
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class BackupService:
@@ -21,7 +24,11 @@ class BackupService:
         return self._restic_available
 
     def _get_env(self, target: str = "primary") -> dict[str, str]:
-        """Build environment variables for restic commands."""
+        """Build environment variables for restic commands.
+
+        Note: Credential values are passed via environment variables only,
+        never logged or written to disk.
+        """
         env: dict[str, str] = {}
         if settings.RESTIC_REPOSITORY:
             env["RESTIC_REPOSITORY"] = settings.RESTIC_REPOSITORY
@@ -36,6 +43,28 @@ class BackupService:
                 env["AWS_ACCESS_KEY_ID"] = settings.MINIO_DR_ACCESS_KEY
                 env["AWS_SECRET_ACCESS_KEY"] = settings.MINIO_DR_SECRET_KEY
         return env
+
+    def pre_encrypt_backup_data(
+        self, data: bytes, backup_kek: bytes
+    ) -> bytes:
+        """Pre-encrypt backup data with backup-specific KEK before sending to restic.
+
+        This adds an additional encryption layer on top of restic's own encryption,
+        ensuring data is protected even if restic credentials are compromised.
+        """
+        from app.services.backup_kek_manager import BackupKEKManager
+
+        manager = BackupKEKManager()
+        return manager.encrypt_for_backup(data, backup_kek)
+
+    def decrypt_backup_data(
+        self, encrypted_data: bytes, backup_kek: bytes
+    ) -> bytes:
+        """Decrypt backup data that was pre-encrypted with backup KEK."""
+        from app.services.backup_kek_manager import BackupKEKManager
+
+        manager = BackupKEKManager()
+        return manager.decrypt_from_backup(encrypted_data, backup_kek)
 
     async def init_repository(self) -> dict:
         """Initialize a Restic repository."""
@@ -52,9 +81,12 @@ class BackupService:
             )
             stdout, stderr = await proc.communicate()
             if proc.returncode == 0:
+                logger.info("Restic repository initialized successfully")
                 return {"status": "ok", "output": stdout.decode()}
+            logger.warning("Restic init failed with return code %d", proc.returncode)
             return {"status": "error", "detail": stderr.decode()}
         except Exception as e:
+            logger.error("Failed to initialize restic repository: %s", type(e).__name__)
             return {"status": "error", "detail": str(e)}
 
     async def run_backup(self, target: str = "primary") -> dict:
@@ -79,6 +111,7 @@ class BackupService:
             stdout, stderr = await proc.communicate()
             finished_at = datetime.now(timezone.utc)
             if proc.returncode == 0:
+                logger.info("Backup completed successfully to target=%s", target)
                 return {
                     "status": "completed",
                     "output": stdout.decode(),
@@ -86,6 +119,7 @@ class BackupService:
                     "finished_at": finished_at.isoformat(),
                     "target": target,
                 }
+            logger.warning("Backup failed for target=%s", target)
             return {
                 "status": "failed",
                 "detail": stderr.decode(),
@@ -94,6 +128,7 @@ class BackupService:
                 "target": target,
             }
         except Exception as e:
+            logger.error("Backup exception for target=%s: %s", target, type(e).__name__)
             return {
                 "status": "failed",
                 "detail": str(e),

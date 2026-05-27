@@ -1,9 +1,10 @@
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,7 @@ from app.services.backup import BackupService
 router = APIRouter(tags=["settings-backup"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 backup_service = BackupService()
+logger = logging.getLogger(__name__)
 
 
 class BackupConfigUpdate(BaseModel):
@@ -31,6 +33,20 @@ class BackupConfigUpdate(BaseModel):
     restic_repository: str | None = None
     restic_password: str | None = None
     backup_retention_days: int | None = None
+
+    @field_validator("backup_retention_days")
+    @classmethod
+    def validate_retention_days(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("backup_retention_days must be at least 1")
+        return v
+
+    @field_validator("minio_primary_endpoint", "minio_dr_endpoint")
+    @classmethod
+    def validate_endpoint(cls, v: str | None) -> str | None:
+        if v is not None and v and len(v) > 2048:
+            raise ValueError("Endpoint URL is too long")
+        return v
 
 
 class ScheduleUpdate(BaseModel):
@@ -54,11 +70,11 @@ async def get_backup_config(
     """Return current backup configuration as JSON."""
     return {
         "minio_primary_endpoint": settings.MINIO_PRIMARY_ENDPOINT,
-        "minio_primary_access_key": settings.MINIO_PRIMARY_ACCESS_KEY,
+        "minio_primary_access_key": "***" if settings.MINIO_PRIMARY_ACCESS_KEY else "",
         "minio_primary_secret_key": "***" if settings.MINIO_PRIMARY_SECRET_KEY else "",
         "minio_primary_bucket": settings.MINIO_PRIMARY_BUCKET,
         "minio_dr_endpoint": settings.MINIO_DR_ENDPOINT,
-        "minio_dr_access_key": settings.MINIO_DR_ACCESS_KEY,
+        "minio_dr_access_key": "***" if settings.MINIO_DR_ACCESS_KEY else "",
         "minio_dr_secret_key": "***" if settings.MINIO_DR_SECRET_KEY else "",
         "minio_dr_bucket": settings.MINIO_DR_BUCKET,
         "restic_repository": settings.RESTIC_REPOSITORY,
@@ -74,6 +90,7 @@ async def update_backup_config(
     _user: User = Depends(require_permission("settings", "manage")),
 ):
     """Update backup configuration (runtime only)."""
+    # Apply updates without logging secret values
     if config.minio_primary_endpoint is not None:
         settings.MINIO_PRIMARY_ENDPOINT = config.minio_primary_endpoint
     if config.minio_primary_access_key is not None:
@@ -96,6 +113,7 @@ async def update_backup_config(
         settings.RESTIC_PASSWORD = config.restic_password
     if config.backup_retention_days is not None:
         settings.BACKUP_RETENTION_DAYS = config.backup_retention_days
+    logger.info("Backup configuration updated")
     return {"status": "ok"}
 
 
