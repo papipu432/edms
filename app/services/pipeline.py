@@ -149,6 +149,24 @@ class PipelineService:
                     "Wiki ingest failed for document %d: %s", doc_id, wiki_err
                 )
 
+            # Generate preview (non-critical - failures don't break pipeline)
+            try:
+                from app.services.preview import PreviewService
+
+                preview_svc = PreviewService()
+                preview_svc.generate_and_cache(
+                    document_id=doc_id,
+                    file_path=file_path,
+                    file_type=file_type,
+                    markdown_content=markdown_content,
+                )
+            except Exception as preview_err:
+                logger.warning(
+                    "Preview generation failed for document %d: %s",
+                    doc_id,
+                    preview_err,
+                )
+
             document.status = DocumentStatus.processed
             await db.commit()
 
