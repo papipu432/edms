@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Security Hardening - KMS Abstraction Layer + Backup KEK Isolation + Raw Key Protection. Create a KMS provider abstraction (local file-based, HashiCorp Vault, Cosmian KMS). Ensure backup uses a separate KEK from production encryption. Audit all code paths to ensure no raw key material is logged, stored in DB, or transmitted over network. Update encryption service, key_recovery, backup service to use KMS layer.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Create app/services/kms.py with a KMSProvider abstract base class and three implementations: LocalFileKMS (wraps keys via a root secret derived from passphrase using scrypt), VaultKMS (interface for HashiCorp Vault transit engine), CosmianKMS (interface stub). The KMS should support: wrap_key(plaintext_key) -> wrapped_blob, unwrap_key(wrapped_blob) -> plaintext_key, generate_key() -> wrapped_blob. Add KMS_PROVIDER, KMS_VAULT_URL, KMS_VAULT_TOKEN, KMS_LOCAL_PASSPHRASE to app/core/config.py.",
     "Step 2: Create app/services/backup_kek_manager.py that manages a separate KEK hierarchy for backup encryption. It must: use its own KMS-wrapped KEK distinct from the production KEK, store backup KEK metadata in a separate DB table (backup_encryption_keys), provide encrypt_for_backup(data) and decrypt_from_backup(data) methods that use the backup-specific KEK. Add the BackupEncryptionKey model to app/models/backup.py.",
@@ -26,5 +26,5 @@
     "uv run pytest tests/test_kms.py tests/test_backup_kek.py tests/test_security_hardening.py tests/test_encryption.py -v"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Updated existing test_settings_backup.py to expect masked access keys (was previously checking for plain text access key in GET response). All 338 tests pass including 41 new security tests. Ruff lint passes clean."
 }
