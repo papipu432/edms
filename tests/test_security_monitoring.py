@@ -262,16 +262,21 @@ class TestAlertIngestEndpoint:
     @pytest.mark.asyncio
     async def test_ingest_valid_alert(self, client: AsyncClient, admin_token: str):
         """POST valid alert creates SecurityAlert."""
-        resp = await client.post(
-            "/api/security/monitoring/alerts/ingest",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json={
-                "source": "suricata",
-                "severity": "critical",
-                "message": "Possible C2 beacon detected",
-                "details": {"src_ip": "10.0.0.5", "dst_ip": "1.2.3.4"},
-            },
-        )
+        with patch("app.api.security.settings") as mock_settings:
+            mock_settings.SECURITY_MONITORING_WEBHOOK_SECRET = "test-secret"
+            resp = await client.post(
+                "/api/security/monitoring/alerts/ingest",
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "X-Webhook-Secret": "test-secret",
+                },
+                json={
+                    "source": "suricata",
+                    "severity": "critical",
+                    "message": "Possible C2 beacon detected",
+                    "details": {"src_ip": "10.0.0.5", "dst_ip": "1.2.3.4"},
+                },
+            )
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
@@ -280,30 +285,81 @@ class TestAlertIngestEndpoint:
     @pytest.mark.asyncio
     async def test_ingest_invalid_source(self, client: AsyncClient, admin_token: str):
         """POST with invalid source returns 422."""
-        resp = await client.post(
-            "/api/security/monitoring/alerts/ingest",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json={
-                "source": "invalid_tool",
-                "severity": "low",
-                "message": "test alert",
-            },
-        )
+        with patch("app.api.security.settings") as mock_settings:
+            mock_settings.SECURITY_MONITORING_WEBHOOK_SECRET = "test-secret"
+            resp = await client.post(
+                "/api/security/monitoring/alerts/ingest",
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "X-Webhook-Secret": "test-secret",
+                },
+                json={
+                    "source": "invalid_tool",
+                    "severity": "low",
+                    "message": "test alert",
+                },
+            )
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_ingest_missing_message(self, client: AsyncClient, admin_token: str):
         """POST with empty message returns 422."""
-        resp = await client.post(
-            "/api/security/monitoring/alerts/ingest",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json={
-                "source": "auditd",
-                "severity": "low",
-                "message": "",
-            },
-        )
+        with patch("app.api.security.settings") as mock_settings:
+            mock_settings.SECURITY_MONITORING_WEBHOOK_SECRET = "test-secret"
+            resp = await client.post(
+                "/api/security/monitoring/alerts/ingest",
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "X-Webhook-Secret": "test-secret",
+                },
+                json={
+                    "source": "auditd",
+                    "severity": "low",
+                    "message": "",
+                },
+            )
         assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_ingest_rejects_when_no_secret_configured(
+        self, client: AsyncClient, admin_token: str
+    ):
+        """POST returns 403 when no webhook secret is configured."""
+        with patch("app.api.security.settings") as mock_settings:
+            mock_settings.SECURITY_MONITORING_WEBHOOK_SECRET = ""
+            resp = await client.post(
+                "/api/security/monitoring/alerts/ingest",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "source": "auditd",
+                    "severity": "low",
+                    "message": "test",
+                },
+            )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_ingest_rejects_invalid_secret(
+        self, client: AsyncClient, admin_token: str
+    ):
+        """POST returns error when webhook secret doesn't match."""
+        with patch("app.api.security.settings") as mock_settings:
+            mock_settings.SECURITY_MONITORING_WEBHOOK_SECRET = "correct-secret"
+            resp = await client.post(
+                "/api/security/monitoring/alerts/ingest",
+                headers={
+                    "Authorization": f"Bearer {admin_token}",
+                    "X-Webhook-Secret": "wrong-secret",
+                },
+                json={
+                    "source": "auditd",
+                    "severity": "low",
+                    "message": "test",
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "error"
 
 
 class TestConfigEndpoint:

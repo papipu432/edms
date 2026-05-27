@@ -249,10 +249,16 @@ async def ingest_monitoring_alert(
     x_webhook_secret: str | None = Header(None),
 ):
     """Webhook endpoint to receive alerts from external monitoring tools."""
-    # Validate webhook secret if configured
-    if settings.SECURITY_MONITORING_WEBHOOK_SECRET:
-        if x_webhook_secret != settings.SECURITY_MONITORING_WEBHOOK_SECRET:
-            return {"status": "error", "message": "Invalid webhook secret"}
+    # Validate webhook secret - reject if no secret is configured
+    if not settings.SECURITY_MONITORING_WEBHOOK_SECRET:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=403,
+            detail="Webhook secret not configured. Cannot accept webhook requests.",
+        )
+    if x_webhook_secret != settings.SECURITY_MONITORING_WEBHOOK_SECRET:
+        return {"status": "error", "message": "Invalid webhook secret"}
 
     processor = MonitoringAlertProcessor()
     alert_data = {

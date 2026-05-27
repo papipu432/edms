@@ -83,7 +83,7 @@ class PreviewService:
         body = re.sub(r"`(.+?)`", r"<code>\1</code>", body)
         body = re.sub(
             r"\[(.+?)\]\((.+?)\)",
-            r'<a href="\2">\1</a>',
+            lambda m: self._safe_link(m.group(1), m.group(2)),
             body,
         )
 
@@ -102,6 +102,22 @@ ul {{ padding-left: 20px; }}
 </body>
 </html>"""
         return html
+
+    def _safe_link(self, text: str, href: str) -> str:
+        """Validate link href and return safe HTML anchor or plain text.
+
+        Only allows http://, https://, and relative paths. Rejects dangerous
+        schemes like javascript:, data:, vbscript:.
+        """
+        href_stripped = href.strip().lower()
+        # Allow http, https, and relative paths (no scheme)
+        if href_stripped.startswith(("http://", "https://")) or (
+            ":" not in href_stripped.split("/")[0]
+            and not href_stripped.startswith("//")
+        ):
+            return f'<a href="{href}">{text}</a>'
+        # Reject dangerous schemes
+        return text
 
     def generate_image_preview(self, file_path: Path) -> bytes | None:
         """Create a thumbnail of an image (max 400x400)."""

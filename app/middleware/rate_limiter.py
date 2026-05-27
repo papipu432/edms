@@ -1,4 +1,11 @@
-"""Simple in-memory sliding window rate limiter middleware."""
+"""Simple in-memory sliding window rate limiter middleware.
+
+NOTE: This rate limiter uses per-process in-memory state. In multi-worker
+deployments (e.g., gunicorn with multiple workers, uvicorn --workers N),
+each worker maintains independent state. Rate limits are NOT enforced across
+workers. For production multi-worker deployments, replace with a shared-state
+backend such as Redis.
+"""
 
 import time
 from collections import defaultdict

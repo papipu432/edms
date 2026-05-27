@@ -47,19 +47,6 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         try:
             response = await call_next(request)
-        except EDMSBaseError as exc:
-            status_code = EXCEPTION_STATUS_MAP.get(type(exc), 500)
-            error_response = ErrorResponse.from_exception(exc, request_id=request_id)
-            logger.error(
-                "EDMS error [%s] request_id=%s: %s",
-                exc.error_code,
-                request_id,
-                exc.message,
-            )
-            response = JSONResponse(
-                status_code=status_code,
-                content=error_response.model_dump(mode="json"),
-            )
         except Exception as exc:
             logger.error(
                 "Unhandled exception request_id=%s: %s: %s",

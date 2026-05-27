@@ -21,8 +21,8 @@ class DocumentAuditLog(Base):
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=_generate_uuid
     )
-    document_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
+    document_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("documents.id", ondelete="SET NULL"), index=True, nullable=True
     )
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     actor_id: Mapped[str | None] = mapped_column(

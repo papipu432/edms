@@ -1,4 +1,11 @@
-"""Security monitoring service with KMS rate limiting and alert processing."""
+"""Security monitoring service with KMS rate limiting and alert processing.
+
+NOTE: KMSRateLimiter uses per-process in-memory state. In multi-worker
+deployments (e.g., gunicorn with multiple workers, uvicorn --workers N),
+each worker maintains independent rate limit counters. Rate limits are NOT
+enforced across workers. For production multi-worker deployments, replace
+with a shared-state backend such as Redis.
+"""
 
 import logging
 import time

@@ -83,8 +83,11 @@ class VersioningService:
             enc_path = version_dir / enc_filename
             EnvelopeEncryption.encrypt_file(file_path, enc_path, dek)
             encrypted_path = f"versions/{document_id}/{enc_filename}"
-        except Exception:
-            # If KMS/encryption fails, store unencrypted (test environment)
+
+            # Remove plaintext file after successful encryption
+            file_path.unlink()
+        except (ValueError, OSError, KeyError, NotImplementedError):
+            # If KMS/encryption fails due to known issues, store unencrypted
             logger.warning(
                 "Encryption failed for version %d of document %d, storing unencrypted",
                 next_version,
