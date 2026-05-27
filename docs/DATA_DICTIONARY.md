@@ -652,3 +652,163 @@ Maintained for backward compatibility.
 | `config_key` | String(255) | UNIQUE, NOT NULL | Configuration key |
 | `config_value` | Text | NOT NULL, default="" | Configuration value |
 | `updated_at` | DateTime | NOT NULL, server_default=now(), onupdate=now() | Last update |
+
+---
+
+## Document Versioning Models
+
+### DocumentVersion
+
+**Table:** `document_versions`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | String(36) | PK, UUID default | UUID primary key |
+| `document_id` | Integer | FK -> documents.id, NOT NULL, CASCADE, indexed | Parent document |
+| `version_number` | Integer | NOT NULL, UNIQUE(document_id, version_number) | Sequential version number |
+| `storage_path` | String(1000) | NOT NULL | Path to version file on disk |
+| `encrypted_path` | String(1000) | nullable | Path to encrypted version file |
+| `file_size` | Integer | NOT NULL | File size in bytes |
+| `file_type` | String(100) | NOT NULL | MIME type of the versioned file |
+| `uploader_id` | String(36) | FK -> users.id, nullable | User who uploaded version |
+| `changelog` | Text | nullable | Description of changes in this version |
+| `wrapped_dek` | Text | nullable | KMS-wrapped DEK (hex) for version encryption |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Version creation timestamp |
+
+**Relationships:**
+- `document` -> Document (many-to-one)
+
+**Constraints:**
+- Unique constraint on (`document_id`, `version_number`)
+
+---
+
+## Audit Models
+
+### DocumentAuditLog
+
+**Table:** `document_audit_log`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | String(36) | PK, UUID default | UUID primary key |
+| `document_id` | Integer | FK -> documents.id (SET NULL on delete), indexed, nullable | Target document |
+| `action` | String(64) | NOT NULL | Action type (upload, view, download, edit, approve, reject, version_create, revert, delete, share, annotate) |
+| `actor_id` | String(36) | FK -> users.id, nullable | User who performed the action |
+| `actor_username` | String(256) | nullable | Username snapshot at time of action |
+| `ip_address` | String(45) | nullable | Client IP address |
+| `user_agent` | String(512) | nullable | Client user agent string |
+| `timestamp` | DateTime | server_default=now() | When the action occurred |
+| `details_json` | JSON | nullable | Additional structured details about the action |
+
+**Indexes:**
+- Composite index on (`document_id`, `timestamp`)
+
+**Design Notes:**
+- Immutable append-only log; entries are never modified or deleted
+- `document_id` uses SET NULL on delete so audit trail survives document deletion
+- `actor_username` is denormalized for performance in audit report queries
+
+---
+
+## Chat Models
+
+### ChatSession
+
+**Table:** `chat_sessions`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | String(36) | PK, UUID default | UUID primary key |
+| `user_id` | String(36) | FK -> users.id, NOT NULL, CASCADE | Session owner |
+| `title` | String(255) | NOT NULL | Session display title |
+| `scope_type` | String(20) | NOT NULL, default="global" | Scope: global, document, or group |
+| `scope_id` | Integer | nullable | ID of scoped document or group |
+| `created_at` | DateTime | server_default=now() | Session creation timestamp |
+| `updated_at` | DateTime | server_default=now(), onupdate=now(), nullable | Last activity |
+
+**Relationships:**
+- `messages` -> list[ChatMessage] (one-to-many, cascade delete, ordered by created_at)
+
+### ChatMessage
+
+**Table:** `chat_messages`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | String(36) | PK, UUID default | UUID primary key |
+| `session_id` | String(36) | FK -> chat_sessions.id, NOT NULL, CASCADE | Parent session |
+| `role` | String(20) | NOT NULL | Message role: "user" or "assistant" |
+| `content` | Text | NOT NULL | Message text content |
+| `sources_json` | JSON | nullable | Source document references for assistant messages |
+| `created_at` | DateTime | server_default=now() | Message timestamp |
+
+**Relationships:**
+- `session` -> ChatSession (many-to-one)
+
+**Design Notes:**
+- Sessions use windowed history (last 20 messages) for LLM context
+- Scope allows chat sessions tied to specific documents or groups
+
+---
+
+## Notification Models
+
+### Notification
+
+**Table:** `notifications`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | String(36) | PK, UUID default | UUID primary key |
+| `user_id` | String(36) | nullable | Target user (NULL for broadcast notifications) |
+| `notification_type` | String(64) | NOT NULL | Type: document_status, lifecycle_alert, ransomware_alert, backup_status |
+| `title` | String(256) | NOT NULL | Notification title |
+| `message` | Text | NOT NULL | Notification body text |
+| `data_json` | JSON | nullable | Structured payload data |
+| `is_read` | Boolean | NOT NULL, default=False | Read/unread tracking |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+
+---
+
+## Relationship Models
+
+### DocumentRelationship
+
+**Table:** `document_relationships`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `source_document_id` | Integer | FK -> documents.id, NOT NULL, CASCADE | Source document |
+| `target_document_id` | Integer | FK -> documents.id, NOT NULL, CASCADE | Target document |
+| `relationship_type` | Enum(RelationshipType) | NOT NULL | Type of relationship |
+| `description` | Text | nullable | Optional description of the relationship |
+| `created_by` | Integer | FK -> users.id (SET NULL on delete), nullable | User who created the relationship |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+
+**Constraints:**
+- Unique constraint on (`source_document_id`, `target_document_id`, `relationship_type`)
+
+### RelationshipType Enum
+
+| Value | Description |
+|-------|-------------|
+| `parent` | Source is a parent of target |
+| `child` | Source is a child of target |
+| `related` | General relationship |
+| `supersedes` | Source supersedes/replaces target |
+| `references` | Source references target |
+
+---
+
+## Updated Document Model Fields
+
+The Document model has been extended with:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `current_version` | Integer | Current active version number (updated by versioning) |
+
+**New Relationships on Document:**
+- `versions` -> list[DocumentVersion] (one-to-many)

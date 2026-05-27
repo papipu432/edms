@@ -5,16 +5,30 @@ An intelligent Enterprise Document Management System (EDMS) powered by LLM techn
 ## Key Capabilities
 
 - **Document Management** - Upload, organize, version, and retrieve documents (PDF, DOCX, images, text) with group-based folder hierarchy
+- **Document Versioning** - Upload new versions of documents with independent encryption per version, compare versions, and revert to prior versions
+- **Document Audit Trail** - Immutable append-only log of all document operations (upload, view, download, edit, approve, reject, version_create, revert, delete, share, annotate)
+- **Document Preview** - Cached preview generation for PDFs (thumbnails), markdown (HTML), and images
+- **Document Comparison** - Side-by-side diff of two documents or two versions with unified diff, similarity ratio, and metadata comparison
+- **Document Relationships** - Typed relationships (parent, child, related, supersedes, references) with graph traversal and orphan detection
 - **LLM Wiki** - AI-powered knowledge base that grows automatically as documents are ingested, extracting entities, topics, and summaries
+- **Obsidian Vault Export** - Export the wiki as an Obsidian-compatible vault with [[wikilinks]], YAML frontmatter, and incremental sync
 - **RAG Search** - Semantic search and chat powered by vector embeddings (ChromaDB) for intelligent document retrieval
+- **Persistent Chat Sessions** - Multi-turn conversations with windowed history, scoped by document or group, with markdown export
+- **WebSocket Notifications** - Real-time push notifications for document status, lifecycle alerts, ransomware, and backup events
 - **RBAC** - Role-Based Access Control with fine-grained permissions, folder assignments, and organizational hierarchy
 - **Encryption** - AES-256-GCM envelope encryption for documents at rest with Shamir Secret Sharing for key recovery
+- **KMS Abstraction** - Pluggable Key Management Service with LocalFileKMS, VaultKMS, and CosmianKMS providers
+- **Backup KEK Isolation** - Separate backup key hierarchy from production for defense in depth
 - **Bulk Operations** - Upload, approve, and sign off multiple documents in a single request with auto-folder creation
 - **Lifecycle Management** - Document lifecycle state machine with expiring/recurring review cycles and email alerts
+- **Health Monitoring** - Orphaned lifecycle detection, broken reviewers, empty groups, stale documents, with HTML dashboard and digest emails
 - **Workflow** - Multi-step approval workflows (submit review, approve, reject, request changes, sign off)
 - **LDAP Integration** - Synchronize users and roles from enterprise LDAP/Active Directory
 - **Backup & DR** - Automated backups to MinIO (primary/DR) and Restic with configurable schedules
-- **Security Monitoring** - Ransomware detection with file system monitoring and alert management
+- **Security Monitoring** - Ransomware detection, auditd/falco/suricata config generation, KMS rate limiting, and alert webhook ingestion
+- **Anti-AI Prompt Injection** - PromptGuard service detecting 5 categories of injection patterns with XML boundary markers
+- **Comprehensive Error Handling** - Structured error responses with error codes, X-Request-ID tracking, rate limiting, and circuit breaker
+- **Setup Wizard** - CLI and web-based first-launch wizard for .env generation, DB setup, KEK/Shamir, MinIO, LLM, and SMTP configuration
 
 ## Technology Stack
 

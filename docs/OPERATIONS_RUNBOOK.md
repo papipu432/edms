@@ -442,3 +442,191 @@ See [SECURITY.md](SECURITY.md) for the full security hardening checklist. Key it
 8. Configure automated backups
 9. Restrict file upload sizes at reverse proxy level
 10. Run as non-root user in Docker
+
+---
+
+## Security Monitoring Deployment
+
+### auditd Configuration
+
+Deploy auditd rules to monitor EDMS storage directories:
+
+```bash
+# /etc/audit/rules.d/edms.rules
+-w /data/edms/storage -p wa -k edms_file_modify
+-w /data/edms/db -p wa -k edms_db_modify
+-w /app/storage/.keys -p rwa -k edms_key_access
+```
+
+Configure auditd to forward alerts to EDMS:
+```bash
+# Script to forward auditd alerts to EDMS webhook
+ausearch -k edms_file_modify --format json | \
+  curl -X POST http://localhost:8000/api/security/alerts \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d @- <<EOF
+{
+  "source": "auditd",
+  "severity": "medium",
+  "message": "File modification detected in storage",
+  "details": {}
+}
+EOF
+```
+
+### Falco Deployment
+
+Deploy Falco for container/process monitoring:
+
+```yaml
+# falco_rules_edms.yaml
+- rule: EDMS Unexpected Process
+  desc: Detect unexpected processes in EDMS container
+  condition: container.name = "edms" and spawned_process and not proc.name in (python, uvicorn, gunicorn)
+  output: "Unexpected process in EDMS container (user=%user.name process=%proc.name)"
+  priority: WARNING
+  tags: [edms, process]
+```
+
+Configure Falco to send alerts to EDMS:
+```yaml
+# falco.yaml (outputs section)
+http_output:
+  enabled: true
+  url: "http://edms:8000/api/security/alerts"
+  headers:
+    Authorization: "Bearer <service-token>"
+```
+
+### Suricata Network Monitoring
+
+Deploy Suricata rules for data exfiltration detection:
+
+```
+# edms.rules
+alert tcp $EDMS_NET any -> $EXTERNAL_NET any (msg:"EDMS potential data exfiltration"; flow:to_server; threshold:type both,track by_src,count 100,seconds 60; sid:1000001; rev:1;)
+```
+
+Configure Suricata EVE log forwarding to EDMS webhook.
+
+### KMS Rate Limiting Configuration
+
+The KMS rate limiter protects against brute-force key extraction:
+
+```env
+# .env configuration
+KMS_RATE_LIMIT_MAX_CALLS=10       # Maximum unwrap calls per IP per minute
+KMS_RATE_LIMIT_WINDOW_SECONDS=60  # Sliding window size
+```
+
+Monitor rate limit status:
+```bash
+# Check which IPs are being rate-limited
+curl http://localhost:8000/api/security/status \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Important:** In multi-worker deployments (gunicorn with multiple workers), rate limiting is per-process. For production, replace with a Redis-backed rate limiter.
+
+---
+
+## KMS Operations
+
+### Provider Selection
+
+Configure the KMS provider in `.env`:
+
+```env
+# Local file-based KMS (default, good for single-server deployments)
+KMS_PROVIDER=local
+KMS_LOCAL_PASSPHRASE=your-strong-passphrase-here
+
+# HashiCorp Vault (for enterprise deployments)
+KMS_PROVIDER=vault
+KMS_VAULT_URL=https://vault.company.com:8200
+KMS_VAULT_TOKEN=hvs.your-vault-token
+
+# Cosmian KMS (for FIPS/confidential computing)
+KMS_PROVIDER=cosmian
+```
+
+### Key Rotation Procedure
+
+1. Generate a new KEK through the encryption settings API
+2. Re-wrap all existing DEKs with the new KEK (background task)
+3. Verify all document decryption still works
+4. Deactivate the old KEK
+
+### Backup KEK Management
+
+The backup KEK is isolated from production to prevent cross-contamination:
+
+```bash
+# Backup KEK is managed via BackupKEKManager
+# It uses the same KMS provider but maintains a separate key hierarchy
+# Never use the same KEK for production and backup encryption
+```
+
+---
+
+## Prompt Injection Alert Handling
+
+When the PromptGuard detects a prompt injection attempt:
+
+1. **Alert Generated** - A SecurityAlert record is created with:
+   - `alert_type`: "prompt_injection"
+   - `severity`: "medium" or "high" depending on pattern
+   - Pattern name and matched text in `details_json`
+
+2. **Response Procedure:**
+   ```bash
+   # Check recent prompt injection alerts
+   curl "http://localhost:8000/api/security/alerts?limit=50" \
+     -H "Authorization: Bearer $TOKEN" | jq '.[] | select(.alert_type == "prompt_injection")'
+   ```
+
+3. **Investigation:**
+   - Review the `source` field (e.g., "chat_message", "document_content")
+   - Check the `details_json.matched_text` to understand the attempt
+   - Determine if the pattern is a false positive (legitimate text that matches patterns)
+
+4. **Resolution:**
+   - If false positive: acknowledge the alert
+   - If genuine attack: review the user's recent activity, consider account suspension
+   - If via document content: review the uploaded document for embedded attacks
+
+---
+
+## Circuit Breaker Tuning
+
+The error handling system includes a circuit breaker pattern for external services (LLM, KMS):
+
+When external services fail repeatedly:
+- Requests fail fast instead of timing out
+- The system enters a degraded mode
+- Services are retried after a cooldown period
+
+Monitor circuit breaker status in application logs. Look for `KMS_ERROR` or `PROCESSING_ERROR` error codes in responses.
+
+---
+
+## Health Monitoring Operations
+
+### Scheduled Health Checks
+
+Set up a cron job to run health checks and send digest emails:
+
+```bash
+# Daily health check at 7 AM
+0 7 * * * curl -X POST http://localhost:8000/api/health/send-digest -H "Authorization: Bearer $SERVICE_TOKEN" 2>/dev/null
+```
+
+### Issue Types and Actions
+
+| Issue Type | Severity | Action |
+|-----------|----------|--------|
+| expired_lifecycle | High | Renew or archive the document |
+| broken_reviewer | High | Reassign reviewer |
+| empty_group | Low | Remove group or add documents |
+| stale_document | Medium | Retry processing or mark as failed |

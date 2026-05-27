@@ -1131,6 +1131,638 @@ curl -X POST http://localhost:8000/api/settings/encryption/recover \
 
 ---
 
+## Document Versioning
+
+### Upload a new version
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/versions \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@updated-document.pdf" \
+  -F "changelog=Fixed formatting issues in section 3"
+```
+
+**Response:**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "document_id": 1,
+  "version_number": 2,
+  "storage_path": "versions/1/v2_updated-document.pdf",
+  "encrypted_path": "versions/1/v2_updated-document.pdf.enc",
+  "file_size": 245780,
+  "file_type": "application/pdf",
+  "uploader_id": "user-uuid",
+  "changelog": "Fixed formatting issues in section 3",
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List all versions of a document
+
+```bash
+curl http://localhost:8000/api/documents/1/versions
+```
+
+**Response:**
+```json
+{
+  "versions": [
+    {
+      "id": "a1b2c3d4-...",
+      "document_id": 1,
+      "version_number": 2,
+      "file_size": 245780,
+      "file_type": "application/pdf",
+      "uploader_id": "user-uuid",
+      "changelog": "Fixed formatting issues in section 3",
+      "created_at": "2024-01-15T10:30:00"
+    },
+    {
+      "id": "f7e8d9c0-...",
+      "document_id": 1,
+      "version_number": 1,
+      "file_size": 234500,
+      "file_type": "application/pdf",
+      "uploader_id": "user-uuid",
+      "changelog": null,
+      "created_at": "2024-01-14T09:00:00"
+    }
+  ],
+  "total": 2
+}
+```
+
+### Get a specific version
+
+```bash
+curl http://localhost:8000/api/documents/1/versions/VERSION_UUID
+```
+
+### Revert to a specific version
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/versions/VERSION_UUID/revert \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Compare two versions
+
+```bash
+curl "http://localhost:8000/api/documents/1/versions/compare?version_a=1&version_b=2"
+```
+
+**Response:**
+```json
+{
+  "version_a": {
+    "version_number": 1,
+    "file_size": 234500,
+    "file_type": "application/pdf",
+    "uploader_id": "user-uuid",
+    "created_at": "2024-01-14T09:00:00"
+  },
+  "version_b": {
+    "version_number": 2,
+    "file_size": 245780,
+    "file_type": "application/pdf",
+    "uploader_id": "user-uuid",
+    "created_at": "2024-01-15T10:30:00"
+  },
+  "size_diff": 11280,
+  "time_diff_seconds": 91800
+}
+```
+
+---
+
+## Document Audit Trail
+
+### Get document history
+
+```bash
+curl "http://localhost:8000/api/documents/1/history?limit=50&offset=0" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "entries": [
+    {
+      "id": "uuid-1",
+      "document_id": 1,
+      "action": "version_create",
+      "actor_id": "user-uuid",
+      "actor_username": "admin",
+      "ip_address": "127.0.0.1",
+      "user_agent": "curl/7.68.0",
+      "timestamp": "2024-01-15T10:30:00",
+      "details_json": {"version_number": 2, "changelog": "Updated section 3"}
+    },
+    {
+      "id": "uuid-2",
+      "document_id": 1,
+      "action": "upload",
+      "actor_id": "user-uuid",
+      "actor_username": "admin",
+      "ip_address": "127.0.0.1",
+      "timestamp": "2024-01-14T09:00:00",
+      "details_json": null
+    }
+  ],
+  "total": 2
+}
+```
+
+### Filter by action type
+
+```bash
+curl "http://localhost:8000/api/documents/1/history?action=approve" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Get system-wide recent activity
+
+```bash
+curl "http://localhost:8000/api/audit/recent?limit=50" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Document Preview
+
+### Get a document preview
+
+```bash
+# Get the default preview (PNG thumbnail or HTML)
+curl http://localhost:8000/api/documents/1/preview \
+  -H "Authorization: Bearer $TOKEN" \
+  -o preview.png
+
+# Force thumbnail type
+curl "http://localhost:8000/api/documents/1/preview?type=thumbnail" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o thumbnail.png
+
+# Force HTML preview type
+curl "http://localhost:8000/api/documents/1/preview?type=html" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Get preview metadata
+
+```bash
+curl http://localhost:8000/api/documents/1/preview/metadata \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "document_id": 1,
+  "preview_type": "png",
+  "file_size": 45230,
+  "exists": true
+}
+```
+
+---
+
+## Document Comparison
+
+### Compare two documents
+
+```bash
+curl "http://localhost:8000/api/documents/compare?doc_a=1&doc_b=2" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "metadata": {
+    "fields": [
+      {"field": "original_filename", "doc_a_value": "policy-v1.pdf", "doc_b_value": "policy-v2.pdf", "differs": true},
+      {"field": "file_size", "doc_a_value": 45000, "doc_b_value": 48500, "differs": true},
+      {"field": "file_type", "doc_a_value": "application/pdf", "doc_b_value": "application/pdf", "differs": false},
+      {"field": "status", "doc_a_value": "processed", "doc_b_value": "processed", "differs": false}
+    ]
+  },
+  "content_diff": {
+    "unified_diff": "--- Document A\n+++ Document B\n@@ -1,5 +1,6 @@\n...",
+    "additions_count": 12,
+    "deletions_count": 3,
+    "similarity_ratio": 0.87
+  },
+  "has_content_diff": true
+}
+```
+
+### Compare version content (diff)
+
+```bash
+curl "http://localhost:8000/api/documents/1/versions/diff?version_a=1&version_b=2" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "unified_diff": "--- Document A\n+++ Document B\n@@ -10,3 +10,5 @@...",
+  "additions_count": 5,
+  "deletions_count": 2,
+  "similarity_ratio": 0.92
+}
+```
+
+### HTML side-by-side comparison page
+
+```bash
+curl "http://localhost:8000/api/documents/compare/html?doc_a=1&doc_b=2" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Returns a full HTML page with a visual side-by-side diff table.
+
+---
+
+## Document Relationships
+
+### Create a relationship
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/relationships \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_document_id": 2,
+    "relationship_type": "references",
+    "description": "Section 3 references this policy"
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "source_document_id": 1,
+  "target_document_id": 2,
+  "relationship_type": "references",
+  "description": "Section 3 references this policy",
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List document relationships
+
+```bash
+curl http://localhost:8000/api/documents/1/relationships
+```
+
+### Delete a relationship
+
+```bash
+curl -X DELETE http://localhost:8000/api/relationships/1
+```
+
+### Get relationship graph
+
+```bash
+# Full graph
+curl http://localhost:8000/api/relationships/graph
+
+# Filtered by group
+curl "http://localhost:8000/api/relationships/graph?group_id=1"
+```
+
+**Response:**
+```json
+{
+  "nodes": [
+    {"id": 1, "label": "policy.pdf"},
+    {"id": 2, "label": "procedures.pdf"}
+  ],
+  "edges": [
+    {"source": 1, "target": 2, "type": "references", "description": "Section 3 references this policy"}
+  ]
+}
+```
+
+### Detect orphaned documents
+
+```bash
+curl http://localhost:8000/api/relationships/orphaned
+```
+
+### Get transitive dependencies
+
+```bash
+curl http://localhost:8000/api/documents/1/dependencies
+```
+
+**Response:**
+```json
+[2, 5, 8]
+```
+
+---
+
+## Persistent Chat Sessions
+
+### Create a chat session
+
+```bash
+curl -X POST http://localhost:8000/api/chat/sessions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Architecture Discussion",
+    "scope_type": "document",
+    "scope_id": 1
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": "session-uuid",
+  "title": "Architecture Discussion",
+  "scope_type": "document",
+  "scope_id": 1,
+  "created_at": "2024-01-15T10:30:00",
+  "message_count": 0
+}
+```
+
+### List chat sessions
+
+```bash
+curl http://localhost:8000/api/chat/sessions \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Send a message and get AI response
+
+```bash
+curl -X POST http://localhost:8000/api/chat/sessions/SESSION_UUID/messages \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What are the key security requirements?"}'
+```
+
+**Response:**
+```json
+{
+  "message": {
+    "id": "msg-uuid",
+    "role": "assistant",
+    "content": "Based on the documents, the key security requirements are...",
+    "sources": [{"document_id": 3, "chunk_text": "..."}],
+    "created_at": "2024-01-15T10:30:05"
+  },
+  "session": {
+    "id": "session-uuid",
+    "title": "Architecture Discussion",
+    "scope_type": "document",
+    "scope_id": 1,
+    "created_at": "2024-01-15T10:30:00",
+    "message_count": 2
+  }
+}
+```
+
+### Get session messages
+
+```bash
+curl http://localhost:8000/api/chat/sessions/SESSION_UUID/messages \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Export session as markdown
+
+```bash
+curl "http://localhost:8000/api/chat/sessions/SESSION_UUID/export?format=markdown" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "format": "markdown",
+  "content": "# Architecture Discussion\n\n**User:** What are the key security requirements?\n\n**Assistant:** Based on the documents..."
+}
+```
+
+### Delete a session
+
+```bash
+curl -X DELETE http://localhost:8000/api/chat/sessions/SESSION_UUID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## WebSocket Notifications
+
+### Connect to real-time notifications
+
+```javascript
+// JavaScript WebSocket client example
+const ws = new WebSocket("ws://localhost:8000/ws/notifications?token=YOUR_JWT_TOKEN");
+
+ws.onmessage = (event) => {
+  const notification = JSON.parse(event.data);
+  console.log(notification.title, notification.message);
+};
+
+// Keep-alive ping
+setInterval(() => ws.send("ping"), 30000);
+```
+
+### List notifications (REST)
+
+```bash
+curl "http://localhost:8000/api/notifications?limit=50&offset=0" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "notif-uuid",
+    "user_id": "user-uuid",
+    "notification_type": "document_status",
+    "title": "Document Status: processed",
+    "message": "Document 'report.pdf' status changed to 'processed'.",
+    "data": {"document_id": "1", "status": "processed"},
+    "is_read": false,
+    "created_at": "2024-01-15T10:30:00"
+  }
+]
+```
+
+### Mark notification as read
+
+```bash
+curl -X POST http://localhost:8000/api/notifications/NOTIF_UUID/read \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Mark all as read
+
+```bash
+curl -X POST http://localhost:8000/api/notifications/read-all \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Get unread count
+
+```bash
+curl http://localhost:8000/api/notifications/unread-count \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{"unread_count": 3}
+```
+
+---
+
+## Obsidian Vault Export
+
+### Export full vault as ZIP
+
+```bash
+curl http://localhost:8000/api/wiki/export/obsidian \
+  -H "Authorization: Bearer $TOKEN" \
+  -o obsidian-vault.zip
+```
+
+The ZIP contains:
+- Markdown files with [[wikilink]] syntax
+- YAML frontmatter with Dataview properties
+- Folder structure matching the wiki layout
+
+### Incremental sync
+
+```bash
+curl "http://localhost:8000/api/wiki/export/obsidian/sync?since=2024-01-14T00:00:00" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "modified_pages": [
+    {"path": "entities/openai.md", "modified_at": "2024-01-15T10:30:00"},
+    {"path": "topics/architecture.md", "modified_at": "2024-01-15T09:00:00"}
+  ]
+}
+```
+
+### Get a single page in Obsidian format
+
+```bash
+curl http://localhost:8000/api/wiki/export/obsidian/page/entities/openai.md \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "path": "entities/openai.md",
+  "content": "---\ntitle: OpenAI\ntags: [entity, technology]\n---\n\n# OpenAI\n\n..."
+}
+```
+
+---
+
+## Security Monitoring (Extended)
+
+### Get monitoring layer status
+
+```bash
+curl http://localhost:8000/api/security/status \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response includes:**
+```json
+{
+  "file_integrity": {"tool": "auditd", "status": "configured"},
+  "process_monitoring": {"tool": "falco", "status": "configured"},
+  "kms_audit": {"tool": "kms_rate_limiter", "status": "configured"},
+  "network": {"tool": "suricata", "status": "configured"}
+}
+```
+
+### Ingest external alert (webhook)
+
+```bash
+curl -X POST http://localhost:8000/api/security/alerts \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "falco",
+    "severity": "high",
+    "message": "Unexpected process spawned in container",
+    "details": {"process": "cryptominer", "pid": 12345}
+  }'
+```
+
+---
+
+## Health Dashboard
+
+### Run a health check
+
+```bash
+curl http://localhost:8000/api/health/check \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "issues": [
+    {
+      "issue_type": "expired_lifecycle",
+      "severity": "high",
+      "document_id": 5,
+      "document_name": "old-policy.pdf",
+      "detail": "Lifecycle expired on 2024-01-01T00:00:00",
+      "recommended_action": "Renew or archive the document lifecycle"
+    },
+    {
+      "issue_type": "empty_group",
+      "severity": "low",
+      "document_id": null,
+      "document_name": null,
+      "detail": "Group 'Archive' (id=3) has no documents",
+      "recommended_action": "Add documents to the group or remove the empty group"
+    }
+  ],
+  "checked_at": "2024-01-15T10:30:00",
+  "summary": {"expired_lifecycle": 1, "empty_group": 1}
+}
+```
+
+### Send health digest email
+
+```bash
+curl -X POST http://localhost:8000/api/health/send-digest \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### View HTML dashboard
+
+Navigate to `/settings/health` in the browser (requires admin role).
+
+---
+
 ## Tips
 
 - All authenticated endpoints require `Authorization: Bearer <token>` header

@@ -417,3 +417,206 @@ Contact your administrator to change your password. If you authenticated via LDA
 6. **Add annotations** - Share feedback on documents with your team
 7. **Use bulk operations** - Save time when approving or signing off multiple documents
 8. **Leverage the wiki** - The more documents you ingest, the more knowledgeable the wiki becomes
+9. **Use versioning** - Upload new versions rather than deleting and re-uploading to preserve history
+10. **Compare before approving** - Use document comparison to verify changes between versions
+11. **Export to Obsidian** - Keep a local copy of the wiki for offline reference
+12. **Use chat sessions** - Have multi-turn conversations scoped to specific documents for focused research
+
+---
+
+## Document Versioning
+
+Versioning lets you upload updated versions of a document while preserving its full history.
+
+### Uploading a New Version
+
+```
+POST /api/documents/{id}/versions
+Content-Type: multipart/form-data
+File: updated-document.pdf
+changelog: "Updated compliance section for Q1 2024"
+```
+
+Each version is independently encrypted with its own encryption key, so older versions remain accessible even if they were encrypted with different keys.
+
+### Viewing Version History
+
+```
+GET /api/documents/{id}/versions
+```
+
+Returns all versions ordered by version number (newest first), including:
+- Version number
+- File size and type
+- Who uploaded it
+- Changelog description
+- Timestamp
+
+### Reverting to an Older Version
+
+If a new version has issues, you can revert to any previous version:
+
+```
+POST /api/documents/{id}/versions/{version_uuid}/revert
+```
+
+This updates the document to point to the selected version. The reverted-from version is not deleted.
+
+---
+
+## Document Comparison
+
+Compare two documents or two versions of the same document to see what changed.
+
+### Comparing Two Documents
+
+```
+GET /api/documents/compare?doc_a=1&doc_b=2
+```
+
+Returns:
+- **Metadata comparison** - Shows which fields differ (filename, size, type, status, etc.)
+- **Content diff** - If both documents have markdown content, shows a unified diff with additions/deletions counts and a similarity ratio (0 to 1)
+
+### HTML Visual Comparison
+
+For a visual side-by-side view:
+```
+GET /api/documents/compare/html?doc_a=1&doc_b=2
+```
+
+Opens an HTML page with highlighted additions (green) and deletions (red).
+
+### Comparing Versions
+
+```
+GET /api/documents/{id}/versions/diff?version_a=1&version_b=2
+```
+
+Shows the content differences between two versions of the same document.
+
+---
+
+## Document Preview
+
+View a quick preview of documents without downloading them.
+
+```
+GET /api/documents/{id}/preview
+```
+
+The preview system supports:
+- **PDF documents** - Generates a PNG thumbnail of the first page
+- **Markdown documents** - Renders as HTML
+- **Images** - Generates a resized thumbnail
+
+Previews are cached on first access and served instantly on subsequent requests.
+
+### Preview Metadata
+
+Check if a preview exists and its type:
+```
+GET /api/documents/{id}/preview/metadata
+```
+
+---
+
+## Persistent Chat Sessions
+
+EDMS provides persistent chat sessions that maintain context across multiple exchanges.
+
+### Creating a Chat Session
+
+```
+POST /api/chat/sessions
+{
+  "title": "Budget Discussion",
+  "scope_type": "document",
+  "scope_id": 5
+}
+```
+
+Scope types:
+- `global` - Chat across all documents
+- `document` - Chat focused on a specific document
+- `group` - Chat focused on documents in a group
+
+### Having a Conversation
+
+```
+POST /api/chat/sessions/{session_id}/messages
+{"message": "What are the main budget allocations?"}
+```
+
+The AI responds with context from the relevant documents, citing sources. The conversation history (up to 20 messages) provides context for follow-up questions.
+
+### Exporting Conversations
+
+Export a chat session as a markdown document for sharing:
+
+```
+GET /api/chat/sessions/{session_id}/export?format=markdown
+```
+
+### Managing Sessions
+
+- **List sessions**: `GET /api/chat/sessions`
+- **View messages**: `GET /api/chat/sessions/{id}/messages`
+- **Delete session**: `DELETE /api/chat/sessions/{id}`
+
+---
+
+## Obsidian Vault Export
+
+Export the EDMS wiki as an Obsidian vault for local, offline access.
+
+### Full Export
+
+```
+GET /api/wiki/export/obsidian
+```
+
+Downloads a ZIP file containing:
+- All wiki pages converted to Obsidian-compatible markdown
+- [[wikilinks]] connecting related pages
+- YAML frontmatter with tags and metadata
+- Dataview-compatible properties for advanced queries
+
+### Incremental Sync
+
+After initial export, sync only changes:
+
+```
+GET /api/wiki/export/obsidian/sync?since=2024-01-14T00:00:00
+```
+
+Returns the list of pages modified since the given timestamp.
+
+---
+
+## Security Dashboard
+
+The security dashboard provides visibility into system health and threats.
+
+### Real-time Notifications
+
+Connect to receive instant notifications via WebSocket:
+- Document processing status changes
+- Lifecycle alerts (expiry/review approaching)
+- Security alerts (ransomware detection)
+- Backup job status
+
+### Notification Management
+
+- **View notifications**: `GET /api/notifications`
+- **Mark as read**: `POST /api/notifications/{id}/read`
+- **Mark all read**: `POST /api/notifications/read-all`
+- **Check unread count**: `GET /api/notifications/unread-count`
+
+### Health Dashboard
+
+Administrators can view the health dashboard at `/settings/health` to see:
+- Documents with expired lifecycles
+- Lifecycles assigned to deactivated reviewers
+- Empty groups with no documents
+- Documents stuck in processing

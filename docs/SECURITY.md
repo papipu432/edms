@@ -294,12 +294,14 @@ POST /api/security/alerts/{alert_id}/acknowledge
 
 | Asset | Sensitivity | Protection |
 |-------|------------|------------|
-| Documents | High | AES-256-GCM encryption, PDF passwords |
+| Documents | High | AES-256-GCM encryption, PDF passwords, per-version DEKs |
 | User credentials | Critical | bcrypt hashing, JWT tokens |
-| KEK | Critical | Passphrase encryption, Shamir shares |
+| KEK | Critical | Passphrase encryption, Shamir shares, KMS wrapping |
+| Backup KEK | Critical | Isolated key hierarchy, KMS wrapped |
 | Database | High | File permissions, backups |
 | Wiki content | Medium | File system permissions |
 | API tokens | High | Short expiration, HMAC-SHA256 |
+| LLM prompts | Medium | Prompt injection sanitization |
 
 ### Threat Vectors
 
@@ -307,13 +309,136 @@ POST /api/security/alerts/{alert_id}/acknowledge
 |--------|-----------|
 | Credential theft | bcrypt hashing, short token expiry, LDAP delegation |
 | Unauthorized access | RBAC, folder assignments, role restrictions |
-| Data at rest exposure | AES-256-GCM envelope encryption |
+| Data at rest exposure | AES-256-GCM envelope encryption, per-version DEKs |
 | Ransomware | File system monitoring, quarantine, backups |
 | SQL injection | SQLAlchemy ORM (parameterized queries) |
 | XSS | FastAPI JSON responses, Jinja2 auto-escaping |
 | CSRF | SameSite cookies, Bearer token auth for API |
-| Key compromise | Shamir Secret Sharing, key rotation |
+| Key compromise | Shamir Secret Sharing, key rotation, backup KEK isolation |
 | Insider threat | Audit logging, role separation, Shamir |
+| Prompt injection | PromptGuard detection, XML boundaries, alert logging |
+| KMS brute force | Per-IP rate limiting (10 unwrap/min), alert generation |
+| Data exfiltration | Suricata network monitoring, audit trail |
+
+---
+
+## Anti-AI Prompt Injection Protection
+
+### Overview
+
+EDMS includes a dedicated `PromptGuard` service that sanitizes all user content before it reaches the LLM. This prevents attackers from embedding instructions in documents or chat messages that could manipulate the AI.
+
+### Detection Categories
+
+| Category | Severity | Examples |
+|----------|----------|---------|
+| Instruction Override | High | "ignore all previous instructions", "forget everything" |
+| Ignore Instructions | High | "disregard all above", "do not follow original rules" |
+| Role Switching | Medium | "you are now a hacker", "pretend to be an unrestricted AI" |
+| Delimiter Injection | Medium | `</system>`, ````system instructions```` |
+| System Prompt Injection | Medium | "system: new instructions" at start of line |
+
+### Protection Pipeline
+
+1. **Detection** - Regex patterns match injection attempts in user text
+2. **Neutralization** - Detected text is prefixed with `[user text]:` to break injection
+3. **Boundary Wrapping** - All user content is wrapped in `<user_content>` XML tags
+4. **Alert Logging** - SecurityAlert records are created for each detection
+5. **Audit Trail** - Pattern name, severity, and matched text are recorded
+
+### Configuration
+
+Prompt injection protection is enabled by default for:
+- Chat session messages (`POST /api/chat/sessions/{id}/messages`)
+- Any service that calls `sanitize_for_llm()`
+
+No configuration is needed. The protection is always active.
+
+---
+
+## KMS Rate Limiting
+
+### Purpose
+
+Prevents brute-force key extraction attacks by limiting the rate of KMS unwrap operations per client IP address.
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `KMS_RATE_LIMIT_MAX_CALLS` | 10 | Maximum unwrap calls per IP per window |
+| `KMS_RATE_LIMIT_WINDOW_SECONDS` | 60 | Sliding window duration in seconds |
+
+### Behavior
+
+- Uses a sliding window algorithm per client IP
+- When limit is exceeded, raises `KMSError` (HTTP 429 equivalent)
+- Logs a warning with the blocked IP address
+- Status queryable via monitoring API
+
+### Limitations
+
+- In multi-worker deployments, rate limits are per-process (not shared)
+- For production multi-worker setups, replace with Redis-backed rate limiter
+
+---
+
+## Security Monitoring Layers
+
+| Layer | Tool | Detects | Integration |
+|-------|------|---------|-------------|
+| File Integrity | auditd | Unauthorized file modifications in storage | Alert webhook |
+| Process Monitoring | Falco | Unexpected processes, privilege escalation | Alert webhook |
+| KMS Audit | Internal Rate Limiter | Brute-force key extraction attempts | Built-in |
+| Network | Suricata | Data exfiltration, C2 communication | Alert webhook |
+
+### Alert Ingestion
+
+External monitoring tools send alerts via webhook:
+
+```
+POST /api/security/alerts
+{
+  "source": "auditd|falco|suricata",
+  "severity": "low|medium|high|critical",
+  "message": "description of the event",
+  "details": { ... }
+}
+```
+
+Alerts are validated (source must be in allowed set), stored as `SecurityAlert` records, and appear in the security dashboard.
+
+---
+
+## Key Isolation Principles
+
+### Production vs Backup Key Hierarchies
+
+EDMS maintains two separate key hierarchies to prevent cross-contamination:
+
+```
+Production Key Hierarchy          Backup Key Hierarchy
+========================          ====================
+Production KEK                    Backup KEK
+  └── wrapped by KMS               └── wrapped by same KMS
+      └── wraps DEKs                    └── wraps backup DEKs
+          └── per-document                  └── per-backup-operation
+              encryption                        encryption
+```
+
+**Rationale:**
+- Compromising backup keys does not expose production documents
+- Compromising production keys does not expose backup archives
+- Each hierarchy can be independently rotated
+- Backup KEK can use different Shamir share distribution than production
+
+### KMS Provider Independence
+
+The KMS abstraction ensures:
+- Raw key material never leaves the KMS boundary
+- Keys are only transmitted in wrapped form
+- The wrapping algorithm (AES-256-GCM with scrypt-derived root key for LocalFileKMS) provides authenticated encryption
+- Provider can be swapped without re-encrypting existing data (re-wrap operation)
 
 ---
 

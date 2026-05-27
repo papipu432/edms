@@ -411,3 +411,95 @@ EOF
 2. Consider moving wiki to SSD storage
 3. Limit context size in queries (the system already truncates to prevent token overflow)
 4. Archive old summary pages that are no longer relevant
+
+---
+
+## Obsidian Vault Export
+
+EDMS can export the entire wiki as an Obsidian-compatible vault, enabling offline browsing and advanced knowledge management.
+
+### Export Features
+
+- **[[Wikilinks]]** - Internal page references are converted to Obsidian's `[[page name]]` link syntax
+- **YAML Frontmatter** - Each page includes metadata (tags, creation date, source documents)
+- **Dataview Properties** - Compatible with the Obsidian Dataview plugin for advanced queries
+- **Folder Structure** - Preserves the wiki's directory layout (entities/, topics/, summaries/)
+
+### Full Export
+
+```
+GET /api/wiki/export/obsidian
+```
+
+Returns a ZIP file containing the complete vault. Extract into your Obsidian vaults directory.
+
+### Incremental Sync
+
+For ongoing synchronization without re-downloading the full vault:
+
+```
+GET /api/wiki/export/obsidian/sync?since=2024-01-14T00:00:00
+```
+
+Returns a list of pages modified after the given timestamp. Use this to update only changed files in your local vault.
+
+### Single Page Export
+
+Retrieve a single page in Obsidian format:
+
+```
+GET /api/wiki/export/obsidian/page/{page_path}
+```
+
+### Recommended Obsidian Plugins
+
+For the best experience with EDMS wiki exports:
+- **Dataview** - Query and filter pages by frontmatter properties
+- **Graph View** - Visualize page relationships (built into Obsidian)
+- **Templates** - Create new pages matching the wiki's structure
+
+---
+
+## Document Relationships in Wiki Context
+
+The document relationship system complements the wiki by providing explicit, typed connections between documents:
+
+### Relationship Types
+
+| Type | Meaning | Wiki Impact |
+|------|---------|-------------|
+| `parent` | Source is the parent document | Creates hierarchical links in wiki entities |
+| `child` | Source is a child of target | Links child summaries to parent pages |
+| `related` | General relationship | Adds "Related Documents" section to wiki pages |
+| `supersedes` | Source replaces target | Updates wiki pages to reference the newer document |
+| `references` | Source cites target | Adds cross-references in both wiki summaries |
+
+### Graph Visualization
+
+The relationship graph endpoint provides visualization-ready data:
+
+```
+GET /api/relationships/graph
+```
+
+Returns nodes (documents) and edges (relationships) suitable for rendering with graph visualization libraries (D3.js, Cytoscape, etc.).
+
+### Orphan Detection
+
+Detect documents with broken relationships (referencing deleted documents):
+
+```
+GET /api/relationships/orphaned
+```
+
+This helps maintain wiki integrity by identifying references that need updating.
+
+### Transitive Dependencies
+
+Find all documents that a given document depends on (directly or transitively):
+
+```
+GET /api/documents/{id}/dependencies
+```
+
+Useful for impact analysis when updating or archiving documents.

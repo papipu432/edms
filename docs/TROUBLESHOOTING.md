@@ -461,3 +461,210 @@ Common issues with symptoms, causes, and solutions.
    ```
 3. Implement token refresh in your client application
 4. If `SECRET_KEY` was rotated, all users must re-authenticate
+
+---
+
+## Document Versioning Issues
+
+**Symptoms:**
+- `{"detail": "Document X not found"}` when uploading a version
+- Version number not incrementing
+- Encrypted path is null despite KMS being configured
+
+**Causes:**
+- Document does not exist (deleted or wrong ID)
+- KMS provider not configured or passphrase missing
+- Storage directory not writable
+- Wrapped DEK storage failure
+
+**Solutions:**
+1. Verify the document exists:
+   ```bash
+   curl http://localhost:8000/api/documents/1
+   ```
+2. Check KMS configuration:
+   ```env
+   KMS_PROVIDER=local
+   KMS_LOCAL_PASSPHRASE=your-passphrase
+   ```
+3. If encryption fails, versions are stored unencrypted (with a warning in logs). Check application logs for "storing unencrypted" messages.
+4. Verify storage directory is writable:
+   ```bash
+   ls -la storage/versions/
+   ```
+5. To manually check version list:
+   ```bash
+   curl http://localhost:8000/api/documents/1/versions
+   ```
+
+---
+
+## WebSocket Connection Problems
+
+**Symptoms:**
+- WebSocket connection immediately closes with code 1008
+- No notifications received after connecting
+- Connection drops after inactivity
+
+**Causes:**
+- Invalid or expired JWT token in query parameter
+- User account deactivated
+- Reverse proxy not configured for WebSocket upgrade
+- No keep-alive ping being sent
+
+**Solutions:**
+1. Verify token is valid before connecting:
+   ```bash
+   curl http://localhost:8000/api/auth/me -H "Authorization: Bearer $TOKEN"
+   ```
+2. Ensure the token is passed as a query parameter:
+   ```
+   ws://localhost:8000/ws/notifications?token=YOUR_JWT_TOKEN
+   ```
+3. Send periodic ping messages to keep the connection alive:
+   ```javascript
+   setInterval(() => ws.send("ping"), 30000);
+   ```
+4. Configure nginx for WebSocket upgrade:
+   ```nginx
+   location /ws/ {
+       proxy_pass http://backend;
+       proxy_http_version 1.1;
+       proxy_set_header Upgrade $http_upgrade;
+       proxy_set_header Connection "upgrade";
+       proxy_read_timeout 86400;
+   }
+   ```
+5. Check that the user account is active (deactivated users are rejected)
+
+---
+
+## Obsidian Export Issues
+
+**Symptoms:**
+- Empty ZIP file returned
+- 404 error on export endpoint
+- Missing wikilinks in exported pages
+- Sync endpoint returns empty results
+
+**Causes:**
+- Wiki directory has no content (no documents processed yet)
+- Wiki path misconfigured
+- Timestamp format incorrect for sync endpoint
+- Wiki pages have no cross-references to convert to wikilinks
+
+**Solutions:**
+1. Check wiki has content:
+   ```bash
+   curl http://localhost:8000/api/wiki/index
+   ls wiki/entities/ wiki/topics/
+   ```
+2. Verify wiki path configuration:
+   ```env
+   WIKI_PATH=wiki
+   ```
+3. For the sync endpoint, use ISO 8601 format:
+   ```bash
+   curl "http://localhost:8000/api/wiki/export/obsidian/sync?since=2024-01-14T00:00:00"
+   ```
+4. Process some documents first to populate the wiki before exporting
+5. If ZIP is empty, check file permissions on the wiki directory
+
+---
+
+## Security Monitoring False Positives
+
+**Symptoms:**
+- Excessive "prompt_injection" alerts for normal documents
+- KMS rate limiter blocking legitimate users
+- External tool alerts flooding the security dashboard
+
+**Causes:**
+- Document content naturally contains patterns that match injection rules (e.g., "ignore previous" in legal text)
+- Batch processing hitting KMS rate limit
+- Monitoring tool misconfiguration generating false alerts
+
+**Solutions:**
+1. For prompt injection false positives:
+   - Acknowledge the alerts: `POST /api/security/alerts/ID/acknowledge`
+   - The system neutralizes the content but still processes it
+   - Review `details_json.matched_text` to confirm it is benign
+
+2. For KMS rate limiting issues:
+   - Increase the limit if batch operations are needed:
+     ```env
+     KMS_RATE_LIMIT_MAX_CALLS=50
+     ```
+   - Stagger batch operations to stay within limits
+   - Check which IPs are blocked via security status endpoint
+
+3. For external alert flooding:
+   - Review the source tool's rules and thresholds
+   - Valid sources are limited to: `auditd`, `falco`, `suricata`
+   - Adjust alert severity thresholds in the external tool
+
+---
+
+## Circuit Breaker Tripped
+
+**Symptoms:**
+- Fast failures on LLM or KMS operations
+- Error responses with `KMS_ERROR` or `PROCESSING_ERROR` codes
+- Operations that previously worked now fail immediately
+
+**Causes:**
+- External service (OpenAI, Ollama, KMS) experiencing outage
+- Network connectivity issues
+- Rate limits hit on external services
+- Circuit breaker protecting against cascade failures
+
+**Solutions:**
+1. Check external service connectivity:
+   ```bash
+   # For OpenAI
+   curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"
+
+   # For Ollama
+   curl http://localhost:11434/api/tags
+   ```
+2. Check KMS provider status:
+   ```bash
+   # Verify KMS passphrase is set
+   grep KMS_LOCAL_PASSPHRASE .env
+   ```
+3. Wait for the cooldown period and retry (circuit breaker will re-test automatically)
+4. Check application logs for the underlying error that triggered the circuit breaker
+5. If the external service is back, the system will resume normal operation after the cooldown
+
+---
+
+## Chat Session Issues
+
+**Symptoms:**
+- "Session not found" errors
+- AI responses not referencing documents
+- Chat history seems to reset
+
+**Causes:**
+- Session was deleted or belongs to a different user
+- Session scope does not match available documents
+- Windowed history (20 messages) exceeded, older context dropped
+
+**Solutions:**
+1. Verify session exists and belongs to you:
+   ```bash
+   curl http://localhost:8000/api/chat/sessions -H "Authorization: Bearer $TOKEN"
+   ```
+2. Create a new session with the correct scope:
+   ```bash
+   curl -X POST http://localhost:8000/api/chat/sessions \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"title": "New Discussion", "scope_type": "document", "scope_id": 1}'
+   ```
+3. For long conversations, start a new session to reset context window
+4. Export the current session before it gets too long:
+   ```bash
+   curl "http://localhost:8000/api/chat/sessions/SESSION_ID/export?format=markdown" \
+     -H "Authorization: Bearer $TOKEN"
+   ```
