@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.lifecycle import DocumentLifecycle
 from app.models.user import User
+from app.schemas.health import HealthReport
 from app.services.lifecycle import LifecycleService
 
 logger = logging.getLogger(__name__)
@@ -96,3 +97,54 @@ class EmailNotificationService:
             count += 1
 
         return count
+
+    def send_health_digest(self, report: HealthReport, recipients: list[str]) -> bool:
+        """Format and send a health digest email to recipients."""
+        if not report.issues:
+            subject = "EDMS Health Digest: All Clear"
+            body_lines = ["<h2>EDMS Health Check Report</h2>", "<p>No issues detected. System is healthy.</p>"]
+        else:
+            subject = f"EDMS Health Digest: {len(report.issues)} issue(s) found"
+            body_lines = [
+                "<h2>EDMS Health Check Report</h2>",
+                f"<p>Checked at: {report.checked_at.isoformat()}</p>",
+                "<h3>Summary</h3><ul>",
+            ]
+            for issue_type, count in report.summary.items():
+                body_lines.append(f"<li>{issue_type}: {count}</li>")
+            body_lines.append("</ul><h3>Issues</h3><table border='1' cellpadding='4'>")
+            body_lines.append("<tr><th>Document</th><th>Type</th><th>Severity</th><th>Detail</th><th>Action</th></tr>")
+            for issue in report.issues:
+                doc_name = issue.document_name or "-"
+                body_lines.append(
+                    f"<tr><td>{doc_name}</td><td>{issue.issue_type}</td>"
+                    f"<td>{issue.severity}</td><td>{issue.detail}</td>"
+                    f"<td>{issue.recommended_action}</td></tr>"
+                )
+            body_lines.append("</table>")
+
+        body = "\n".join(body_lines)
+
+        if not self.smtp_host:
+            logger.info(
+                "SMTP not configured. Health digest: %d issues for %d recipients",
+                len(report.issues),
+                len(recipients),
+            )
+            return False
+
+        try:
+            msg = MIMEText(body, "html")
+            msg["Subject"] = subject
+            msg["From"] = self.from_email
+            msg["To"] = ", ".join(recipients)
+
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                if self.smtp_user and self.smtp_password:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                server.send_message(msg)
+            return True
+        except Exception:
+            logger.exception("Failed to send health digest email")
+            return False

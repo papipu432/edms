@@ -5,6 +5,7 @@ from app.api.auth import router as auth_router
 from app.api.bulk import router as bulk_router
 from app.api.documents import router as documents_router
 from app.api.groups import router as groups_router
+from app.api.health_dashboard import router as health_dashboard_router
 from app.api.ldap import router as ldap_router
 from app.api.org import router as org_router
 from app.api.pages import router as pages_router
@@ -42,3 +43,4 @@ api_router.include_router(security_router)
 api_router.include_router(settings_encryption_router)
 api_router.include_router(lifecycle_router)
 api_router.include_router(relationships_router)
+api_router.include_router(health_dashboard_router)

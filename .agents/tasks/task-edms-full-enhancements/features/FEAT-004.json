@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Orphaned Lifecycle Monitoring Dashboard - Detect documents with expired lifecycles, broken reviewer assignments, empty groups. HTML dashboard with recommended actions. Scheduled daily health check with email digest.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1: Create app/services/health_monitor.py with HealthMonitorService class implementing: detect_expired_lifecycles(db) -> documents past expiry with no renewal, detect_broken_reviewers(db) -> lifecycles assigned to deleted/deactivated users, detect_empty_groups(db) -> groups with no active users, detect_stale_documents(db) -> documents stuck in 'processing' status for >24h, run_full_health_check(db) -> aggregates all checks into a HealthReport dataclass.",
     "Step 2: Create app/schemas/health.py with Pydantic schemas: HealthIssue(issue_type, severity, document_id, document_name, detail, recommended_action), HealthReport(issues: list[HealthIssue], checked_at: datetime, summary: dict with counts per issue_type), HealthDigest(report: HealthReport, sent_to: list[str]).",
