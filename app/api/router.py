@@ -18,6 +18,7 @@ from app.api.settings_encryption import router as settings_encryption_router
 from app.api.users import router as users_router
 from app.api.wiki import router as wiki_router
 from app.api.workflow import router as workflow_router
+from app.api.lifecycle import router as lifecycle_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -38,3 +39,4 @@ api_router.include_router(settings_llm_router)
 api_router.include_router(settings_backup_router)
 api_router.include_router(security_router)
 api_router.include_router(settings_encryption_router)
+api_router.include_router(lifecycle_router)

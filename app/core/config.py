@@ -55,6 +55,15 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
     BOOTSTRAP_ADMIN_EMAIL: str = "admin@edms.local"
 
+    # SMTP / Email notifications
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "edms@example.com"
+    ALERT_DAYS_BEFORE_EXPIRY: int = 30
+    ALERT_DAYS_BEFORE_REVIEW: int = 14
+
     # Registration control
     ALLOW_REGISTRATION: bool = True
 

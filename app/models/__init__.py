@@ -3,6 +3,12 @@ from app.models.backup import BackupConfig, BackupJob, BackupSchedule
 from app.models.document import Document
 from app.models.encryption import EncryptionKey, KeyShare
 from app.models.group import Group
+from app.models.lifecycle import (
+    DocumentLifecycle,
+    DocumentLifecycleState,
+    LifecycleTransition,
+    LifecycleType,
+)
 from app.models.security import MonitoringConfig, SecurityAlert
 from app.models.user import (
     FolderAssignment,
@@ -30,10 +36,14 @@ __all__ = [
     "BackupJob",
     "BackupSchedule",
     "Document",
+    "DocumentLifecycle",
+    "DocumentLifecycleState",
     "EncryptionKey",
     "FolderAssignment",
     "Group",
     "KeyShare",
+    "LifecycleTransition",
+    "LifecycleType",
     "MonitoringConfig",
     "SecurityAlert",
     "LdapConfig",
