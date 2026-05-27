@@ -1,9 +1,11 @@
 """API endpoints for Obsidian vault export."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.core.config import settings
+from app.core.security import get_current_user
+from app.models.user import User
 from app.services.obsidian_export import ObsidianExportService
 
 router = APIRouter(prefix="/api/wiki/export/obsidian", tags=["obsidian"])
@@ -12,7 +14,9 @@ export_service = ObsidianExportService(wiki_path=settings.WIKI_PATH)
 
 
 @router.get("")
-async def export_obsidian_vault():
+async def export_obsidian_vault(
+    current_user: User = Depends(get_current_user),
+):
     """Export the full wiki as an Obsidian-compatible vault in a .zip file."""
     zip_buffer = export_service.create_vault_zip()
 
@@ -28,6 +32,7 @@ async def export_obsidian_vault():
 @router.get("/sync")
 async def sync_obsidian_vault(
     since: str = Query(..., description="ISO 8601 timestamp for incremental sync"),
+    current_user: User = Depends(get_current_user),
 ):
     """Return pages modified after the given timestamp for incremental sync."""
     try:
@@ -40,7 +45,10 @@ async def sync_obsidian_vault(
 
 
 @router.get("/page/{page_path:path}")
-async def get_obsidian_page(page_path: str):
+async def get_obsidian_page(
+    page_path: str,
+    current_user: User = Depends(get_current_user),
+):
     """Return a single wiki page in Obsidian format."""
     from app.services.wiki import WikiService
 

@@ -349,9 +349,11 @@ class TestAPIEndpoints:
     async def obsidian_client(
         self, tmp_path: Path, wiki_path: Path
     ) -> AsyncClient:
-        """Create a test client with the wiki path overridden."""
+        """Create a test client with the wiki path overridden and auth configured."""
         import app.api.obsidian as obsidian_module
+        from app.core.security import get_current_user
         from app.main import app
+        from app.models.user import User
         from app.services.obsidian_export import ObsidianExportService
 
         # Override the export service to use our test wiki
@@ -359,9 +361,26 @@ class TestAPIEndpoints:
             wiki_path=str(wiki_path)
         )
 
+        # Mock auth dependency
+        mock_user = User(
+            id="test-obsidian-user",
+            username="obsidian_tester",
+            display_name="Obsidian Tester",
+            email="obsidian@test.com",
+            hashed_password="fakehash",
+            is_active=True,
+        )
+
+        async def override_get_current_user() -> User:
+            return mock_user
+
+        app.dependency_overrides[get_current_user] = override_get_current_user
+
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
+
+        app.dependency_overrides.clear()
 
     @pytest.mark.anyio
     async def test_export_vault_endpoint_returns_zip(
@@ -383,6 +402,27 @@ class TestAPIEndpoints:
             names = zf.namelist()
             assert "entities/acme-corp.md" in names
             assert "summaries/1.md" in names
+
+    @pytest.mark.anyio
+    async def test_export_vault_endpoint_requires_auth(
+        self, tmp_path: Path, wiki_path: Path
+    ):
+        """Test that export vault endpoint rejects unauthenticated requests."""
+        import app.api.obsidian as obsidian_module
+        from app.main import app
+        from app.services.obsidian_export import ObsidianExportService
+
+        obsidian_module.export_service = ObsidianExportService(
+            wiki_path=str(wiki_path)
+        )
+        # Clear any overrides to test actual auth
+        app.dependency_overrides.clear()
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.get("/api/wiki/export/obsidian")
+
+        assert response.status_code == 401
 
     @pytest.mark.anyio
     async def test_sync_endpoint_returns_changes(
@@ -408,6 +448,29 @@ class TestAPIEndpoints:
         response = await obsidian_client.get("/api/wiki/export/obsidian/sync")
 
         assert response.status_code == 422  # Missing required query param
+
+    @pytest.mark.anyio
+    async def test_sync_endpoint_requires_auth(
+        self, tmp_path: Path, wiki_path: Path
+    ):
+        """Test that sync endpoint rejects unauthenticated requests."""
+        import app.api.obsidian as obsidian_module
+        from app.main import app
+        from app.services.obsidian_export import ObsidianExportService
+
+        obsidian_module.export_service = ObsidianExportService(
+            wiki_path=str(wiki_path)
+        )
+        app.dependency_overrides.clear()
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.get(
+                "/api/wiki/export/obsidian/sync",
+                params={"since": "2000-01-01T00:00:00+00:00"},
+            )
+
+        assert response.status_code == 401
 
     @pytest.mark.anyio
     async def test_page_endpoint_returns_obsidian_format(

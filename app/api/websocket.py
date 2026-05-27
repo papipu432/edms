@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Query, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 from jose import JWTError, jwt
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,11 +117,11 @@ async def mark_notification_read(
     )
     notification = result.scalar_one_or_none()
     if notification is None:
-        return {"detail": "Notification not found"}
+        raise HTTPException(status_code=404, detail="Notification not found")
 
     # Only allow marking notifications targeted to this user or broadcasts
     if notification.user_id is not None and notification.user_id != current_user.id:
-        return {"detail": "Not authorized"}
+        raise HTTPException(status_code=403, detail="Not authorized")
 
     notification.is_read = True
     await db.flush()

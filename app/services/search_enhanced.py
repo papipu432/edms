@@ -22,6 +22,18 @@ from app.services.vectordb import VectorDBService
 logger = logging.getLogger(__name__)
 
 
+def _escape_like(value: str) -> str:
+    """Escape special characters for SQL LIKE patterns.
+
+    Escapes %, _, and \\ to prevent SQL wildcard injection.
+    """
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
 class EnhancedSearchService:
     def __init__(self, vectordb_service: VectorDBService | None = None) -> None:
         self.vectordb_service = vectordb_service
@@ -55,9 +67,13 @@ class EnhancedSearchService:
 
         if request.keywords:
             for kw in request.keywords:
+                # Escape LIKE special characters to prevent wildcard injection
+                escaped_kw = _escape_like(kw)
                 # For SQLite compatibility, use LIKE on the JSON field cast to string
                 query = query.where(
-                    func.cast(Document.keywords, SAString()).like(f"%{kw}%")
+                    func.cast(Document.keywords, SAString()).like(
+                        f"%{escaped_kw}%", escape="\\"
+                    )
                 )
 
         # Get total count
@@ -135,11 +151,12 @@ class EnhancedSearchService:
     ) -> SuggestionsResponse:
         """Get search suggestions from document names and keywords."""
         suggestions: list[SearchSuggestion] = []
-        pattern = f"%{partial_query}%"
+        escaped_query = _escape_like(partial_query)
+        pattern = f"%{escaped_query}%"
 
         # Search document names
         name_query = select(Document.original_filename).where(
-            Document.original_filename.ilike(pattern)
+            Document.original_filename.ilike(pattern, escape="\\")
         ).limit(5)
         name_result = await db.execute(name_query)
         for row in name_result.scalars().all():
@@ -149,7 +166,7 @@ class EnhancedSearchService:
 
         # Search keywords (using LIKE on JSON field for SQLite compat)
         kw_query = select(Document.keywords).where(
-            func.cast(Document.keywords, SAString()).like(pattern)
+            func.cast(Document.keywords, SAString()).like(pattern, escape="\\")
         ).limit(10)
         kw_result = await db.execute(kw_query)
         seen_keywords: set[str] = set()

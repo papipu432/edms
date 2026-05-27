@@ -114,9 +114,21 @@ class ChatService:
         result = await db.execute(stmt)
         all_messages = list(result.scalars().all())
 
+        # Apply sliding window: limit to last 20 messages
+        max_messages = 20
+        windowed_messages = all_messages[-max_messages:]
+
+        # Apply character budget: max 50,000 chars for combined content
+        max_chars = 50000
         messages_for_llm = []
-        for msg in all_messages:
+        total_chars = 0
+        for msg in reversed(windowed_messages):
+            msg_len = len(msg.content)
+            if total_chars + msg_len > max_chars and messages_for_llm:
+                break
             messages_for_llm.append({"role": msg.role, "content": msg.content})
+            total_chars += msg_len
+        messages_for_llm.reverse()
 
         # Perform scoped RAG search
         context, sources = self._perform_rag_search(session, message_text)
