@@ -17,6 +17,7 @@ _ACTION_ALLOWED_ROLES: dict[WorkflowAction, list[str]] = {
     WorkflowAction.approve: ["approver", "admin"],
     WorkflowAction.reject: ["reviewer", "admin"],
     WorkflowAction.request_changes: ["reviewer", "admin"],
+    WorkflowAction.sign_off: ["approver", "admin"],
 }
 
 

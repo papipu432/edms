@@ -12,6 +12,7 @@ class WorkflowAction(str, enum.Enum):
     approve = "approve"
     reject = "reject"
     request_changes = "request_changes"
+    sign_off = "sign_off"
 
 
 class WorkflowEntry(Base):
