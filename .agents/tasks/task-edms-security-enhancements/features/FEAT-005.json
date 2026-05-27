@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Restructure encrypted storage with envelope encryption (AES-256-GCM) and implement Shamir Secret Sharing for key recovery. Change storage layout to data/raw, data/md, data/csv, data/images, data/vectors, uploads/. All artifacts encrypted at rest with unique DEKs wrapped by KEK.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Add 'pycryptodome' and 'secretsharing' (or implement Shamir's scheme) to pyproject.toml. Actually use 'pycryptodome' for AES-256-GCM and implement Shamir SSS manually (it's simple polynomial interpolation over GF(256) or use the 'shamir-mnemonic' package if available, otherwise implement a minimal version).",
     "Step 2 - Create app/services/encryption.py with: (a) EnvelopeEncryption class - generate_dek() returns 32-byte random key, encrypt_dek(dek, kek) wraps DEK with KEK using AES-256-GCM, decrypt_dek(wrapped_dek, kek) unwraps, encrypt_file(plaintext_path, output_path, kek) encrypts file with unique DEK and stores wrapped DEK in file header, decrypt_file(encrypted_path, output_path, kek) decrypts. (b) File format: [4-byte magic][4-byte version][12-byte nonce][16-byte tag][32-byte wrapped_dek_nonce][16-byte wrapped_dek_tag][32-byte wrapped_dek][...ciphertext]. (c) dek_zeroize(dek_bytes) - overwrite memory with zeros after use.",
@@ -33,5 +33,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 251 tests pass (219 existing + 32 new). GF(256) implementation uses generator 3 with irreducible polynomial 0x11B (same as AES). pycryptodome added to main dependencies. Storage service maintains full backward compatibility - existing tests unaffected. Pipeline updated to use save_to_data for new data layout. Vectors category is excluded from encryption by design."
 }
