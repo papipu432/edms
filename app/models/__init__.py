@@ -29,6 +29,7 @@ from app.models.user import (
     User,
     UserRole,
 )
+from app.models.version import DocumentVersion
 from app.models.workflow import WorkflowEntry
 
 __all__ = [
@@ -40,6 +41,7 @@ __all__ = [
     "DocumentAuditLog",
     "DocumentLifecycle",
     "DocumentLifecycleState",
+    "DocumentVersion",
     "EncryptionKey",
     "FolderAssignment",
     "Group",

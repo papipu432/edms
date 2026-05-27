@@ -60,11 +60,14 @@ async def client(db_session: AsyncSession, tmp_path: Path) -> AsyncGenerator[Asy
 
     # Override storage path and pipeline DB URL for tests
     import app.api.documents as doc_module
+    import app.api.versions as versions_module
     from app.services.storage import StorageService
+    from app.services.versioning import VersioningService
 
     doc_module.storage_service = StorageService(base_path=str(tmp_path / "storage"))
     doc_module.pipeline_db_url = db_url
     doc_module.pipeline_service.storage = doc_module.storage_service
+    versions_module.versioning_service = VersioningService(storage_base=str(tmp_path / "storage"))
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

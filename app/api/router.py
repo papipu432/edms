@@ -24,6 +24,7 @@ from app.api.obsidian import router as obsidian_router
 from app.api.chat import router as chat_router
 from app.api.relationships import router as relationships_router
 from app.api.audit import router as audit_router
+from app.api.versions import router as versions_router
 from app.api.websocket import router as notifications_router
 
 api_router = APIRouter()
@@ -51,4 +52,5 @@ api_router.include_router(health_dashboard_router)
 api_router.include_router(obsidian_router)
 api_router.include_router(chat_router)
 api_router.include_router(audit_router)
+api_router.include_router(versions_router)
 api_router.include_router(notifications_router)
