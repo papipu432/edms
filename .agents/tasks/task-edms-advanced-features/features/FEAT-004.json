@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Document Versioning - Version history with independent DEK encryption per version, upload new versions, list versions, revert to previous versions, version comparison metadata",
+  "status": "completed",
+  "steps": [
+    "Create app/models/version.py with a DocumentVersion model (inherits Base): id (String(36) UUID PK), document_id (Integer FK to documents.id ON DELETE CASCADE), version_number (Integer, starts at 1), storage_path (String(1000)), encrypted_path (String(1000), nullable), file_size (Integer), file_type (String(100)), uploader_id (String(36) FK to users.id), changelog (Text, nullable - user-provided comment), wrapped_dek (Text, nullable - KMS-wrapped DEK for this version's encryption), created_at (DateTime). Add a unique constraint on (document_id, version_number). Add relationship to Document.",
+    "Update app/models/document.py to: (a) Add a current_version (Integer, default=1) field. (b) Add a relationship to DocumentVersion (back_populates='document'). (c) Import and ensure DocumentVersion is discoverable by SQLAlchemy metadata.",
+    "Create app/services/versioning.py with a VersioningService class: (a) async create_version(db, document_id, file_content, filename, file_type, uploader_id, changelog=None) - stores the file, generates a new DEK via EnvelopeEncryption, encrypts the version file, stores wrapped DEK in the version record, increments version_number. (b) async list_versions(db, document_id) - returns all versions ordered by version_number desc. (c) async get_version(db, document_id, version_id) - returns specific version. (d) async revert_to_version(db, document_id, version_id, actor_id) - sets document's current_version and storage_path/encrypted_path to the specified version's data. (e) async compare_versions(db, document_id, version_a_number, version_b_number) - returns metadata comparison (size diff, file type changes, upload dates, uploaders).",
+    "Create app/schemas/version.py with Pydantic schemas: VersionResponse (id, version_number, file_size, file_type, uploader_id, changelog, created_at), VersionListResponse (versions list, total), VersionCompareResponse (version_a metadata, version_b metadata, size_diff, created_at_diff).",
+    "Create app/api/versions.py with APIRouter (tags=['versions']): (a) POST /api/documents/{document_id}/versions - upload new version (accepts file + optional changelog field). Requires authentication. (b) GET /api/documents/{document_id}/versions - list all versions. (c) GET /api/documents/{document_id}/versions/{version_id} - get specific version metadata. (d) POST /api/documents/{document_id}/versions/{version_id}/revert - revert to this version. (e) GET /api/documents/{document_id}/versions/compare?version_a={n}&version_b={n} - compare two versions.",
+    "Register the versions router in app/api/router.py.",
+    "Update app/models/__init__.py to export DocumentVersion.",
+    "Integrate with audit trail (FEAT-003): log 'version_create' when a new version is uploaded, log 'revert' when reverting.",
+    "Create tests/test_versions.py with tests for: (a) Upload new version increments version_number. (b) List versions returns all versions ordered. (c) Get specific version returns correct data. (d) Revert updates document to point to old version. (e) Compare returns size diff between two versions. (f) Each version has independent encryption (different wrapped_dek). (g) Version 1 is created on initial document upload."
+  ],
+  "acceptance_criteria": [
+    "Uploading a new version creates a new DocumentVersion record without overwriting previous",
+    "Each version is encrypted with its own independent DEK",
+    "GET /api/documents/{id}/versions lists all versions with metadata",
+    "POST /api/documents/{id}/versions/{version_id}/revert changes document to point at old version",
+    "Version comparison endpoint returns size diff and metadata differences",
+    "Versioning integrates with audit trail",
+    "All existing tests continue to pass",
+    "New tests in test_versions.py all pass"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": "All 557 tests pass (9 new + 548 existing). KMS encryption works in test environment since default KMS_LOCAL_PASSPHRASE is set. VersioningService uses configurable storage_base path (overridden in conftest for test isolation). Compare endpoint placed before version_id route to avoid path conflicts. Used from __future__ import annotations and TYPE_CHECKING to handle circular import between Document and DocumentVersion models."
+}
