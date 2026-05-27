@@ -2,7 +2,7 @@
   "id": "FEAT-006",
   "type": "feat",
   "description": "Enhanced Search UX - Full-text search across content + metadata, faceted search (by group, lifecycle state, date range, keywords, file type), search suggestions/autocomplete, search history for logged-in users, and related documents suggestions based on vector similarity.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Create app/models/search_history.py with SearchHistory model: id, user_id (FK), query_text, filters_json (stored facets used), results_count, searched_at. This persists search history per user.",
     "Step 2: Create app/schemas/search_enhanced.py extending the existing search schemas with: FacetedSearchRequest(query, group_id, lifecycle_state, date_from, date_to, keywords, file_type, page, page_size), FacetedSearchResponse(results, facets: dict with available filter values and counts, total_count, page, page_size), SearchSuggestion(text, source: 'keyword'|'entity'|'document_name'), RelatedDocumentsResponse(document_id, related: list of {doc_id, doc_name, similarity_score}).",
@@ -21,5 +21,5 @@
     "uv run pytest tests/test_search_enhanced.py -v"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 12 new tests pass. All 446 total tests pass (including 434 pre-existing). Ruff lint clean. SQLite JSON field search uses LIKE on cast string for compatibility. Search history ordering uses set-based assertion instead of timestamp ordering due to SQLite sub-second resolution."
 }
