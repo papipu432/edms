@@ -17,8 +17,10 @@ def anyio_backend():
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+async def db_session(tmp_path: Path) -> AsyncGenerator[AsyncSession, None]:
+    db_path = tmp_path / "test.db"
+    db_url = f"sqlite+aiosqlite:///{db_path}"
+    engine = create_async_engine(db_url, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -31,6 +33,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession, tmp_path: Path) -> AsyncGenerator[AsyncClient, None]:
+    # Extract the DB URL from the engine bound to the session
+    db_url = str(db_session.get_bind().url)
+
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield db_session
@@ -41,11 +46,13 @@ async def client(db_session: AsyncSession, tmp_path: Path) -> AsyncGenerator[Asy
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Override storage path for tests
+    # Override storage path and pipeline DB URL for tests
     import app.api.documents as doc_module
     from app.services.storage import StorageService
 
     doc_module.storage_service = StorageService(base_path=str(tmp_path / "storage"))
+    doc_module.pipeline_db_url = db_url
+    doc_module.pipeline_service.storage = doc_module.storage_service
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

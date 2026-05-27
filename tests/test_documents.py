@@ -21,7 +21,7 @@ async def test_upload_document(client: AsyncClient, sample_pdf: Path):
     assert data["original_filename"] == "test.pdf"
     assert data["group_id"] == group_id
     assert data["file_type"] == "application/pdf"
-    assert data["status"] == "uploaded"
+    assert data["status"] == "processing"
     assert data["file_size"] > 0
 
 

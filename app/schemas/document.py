@@ -23,3 +23,10 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     documents: list[DocumentResponse]
     total: int
+
+
+class DocumentStatusResponse(BaseModel):
+    id: int
+    status: DocumentStatus
+
+    model_config = {"from_attributes": True}

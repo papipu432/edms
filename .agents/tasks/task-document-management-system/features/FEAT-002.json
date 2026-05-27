@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Document processing pipeline: preprocessing (deskew, enhance, denoise for images), conversion to Markdown/CSV/Images using pytesseract and python-docx, and background task orchestration. This implements the core document transformation pipeline that runs after upload.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add dependencies to pyproject.toml: Pillow, pytesseract, python-docx, pymupdf (fitz for PDF text/image extraction), pandas (for CSV table output). Note: pytesseract requires tesseract-ocr system package - add a note in README but handle gracefully if not available.",
     "Create app/services/preprocessing.py (PreprocessingService): deskew_image (using Pillow rotate with OSD from pytesseract or simple heuristic), enhance_image (contrast enhancement with PIL.ImageEnhance), denoise_image (median filter with PIL.ImageFilter). Each takes PIL.Image and returns PIL.Image. Add a preprocess_pipeline method that chains all three.",
