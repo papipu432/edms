@@ -4,12 +4,14 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.llm import extract_keywords, generate_embeddings, generate_summary
 from app.models.document import Document, DocumentStatus
 from app.services.chunker import split_text
 from app.services.converter import ConversionService
 from app.services.storage import StorageService
 from app.services.vectordb import VectorDBService
+from app.services.wiki import WikiService
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +111,22 @@ class PipelineService:
                     group_id=document.group_id,
                     chunks=chunks,
                     embeddings=embeddings,
+                )
+
+            # Ingest into wiki
+            try:
+                wiki = WikiService(wiki_path=settings.WIKI_PATH)
+                wiki.ingest(
+                    doc_id=document.id,
+                    title=document.original_filename,
+                    markdown_content=markdown_content,
+                    summary=summary,
+                    keywords=keywords,
+                    metadata={"group_id": document.group_id},
+                )
+            except Exception as wiki_err:
+                logger.warning(
+                    "Wiki ingest failed for document %d: %s", doc_id, wiki_err
                 )
 
             document.status = DocumentStatus.processed

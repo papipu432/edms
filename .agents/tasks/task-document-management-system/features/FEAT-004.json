@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "LLM Wiki system based on Karpathy's pattern: incrementally build and maintain a persistent wiki of interlinked markdown files. When documents are ingested, the system extracts key information and integrates it into the wiki - updating entity pages, topic summaries, the index, and the operation log. Includes wiki query and lint operations.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create app/services/wiki.py (WikiService): manages the wiki directory structure at {WIKI_PATH}/. The wiki has: index.md (content catalog), log.md (chronological operation log), entities/ (entity pages), topics/ (concept/topic pages), summaries/ (document summaries). Initialize wiki structure on first use.",
     "Implement WikiService.ingest(doc_id, markdown_content, summary, keywords, metadata): This is called after document processing. Steps: (1) Create/update summaries/{doc_id}.md with document summary. (2) Use LLM to extract entities and topics from the content. (3) For each entity, create or update entities/{entity_slug}.md - if page exists, merge new information using LLM. (4) For each topic, create or update topics/{topic_slug}.md. (5) Update index.md with new entries. (6) Append operation to log.md with timestamp. Use LLM calls with specific prompts for entity extraction and page merging.",
