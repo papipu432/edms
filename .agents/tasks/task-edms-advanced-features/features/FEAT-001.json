@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Comprehensive Error Handling - Global exception handlers, structured error responses, request ID tracking, rate limiting, and circuit breaker pattern for external services",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create app/services/error_handling.py with: (a) Error taxonomy as exception classes (ValidationError, AuthError, PermissionError, NotFoundError, ConflictError, ProcessingError, StorageError, EncryptionError, KMSError), each with an error_code string. (b) A structured ErrorResponse Pydantic model with fields: error_code, message, detail, request_id, timestamp. (c) A circuit breaker class (CircuitBreaker) with states open/closed/half-open, configurable failure_threshold, recovery_timeout, and methods call/record_success/record_failure.",
     "Create app/middleware/__init__.py and app/middleware/error_handler.py with: (a) Request ID middleware that generates a UUID for each request, stores it in request.state.request_id, and adds X-Request-ID header to response. (b) Global exception handlers registered on the FastAPI app for each custom exception class, returning structured JSON ErrorResponse with appropriate HTTP status codes (400 for validation, 401 for auth, 403 for permission, 404 for not found, 409 for conflict, 500 for processing/storage/encryption/kms). (c) A fallback handler for unhandled exceptions returning 500 with generic message (never exposing internal details).",
@@ -27,5 +27,5 @@
     "uv run pytest tests/ -x -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Rate limiter middleware state persists across test functions since app is a shared singleton. Added reset() method to RateLimiterMiddleware and CircuitBreaker, and reset them in conftest.py client fixture teardown. Circuit breaker fallback message for chat_completion needed to contain 'failed' to satisfy existing test_llm.py assertion. BaseHTTPMiddleware re-raises exceptions before FastAPI exception_handlers can catch them, so exception handling is done within RequestIDMiddleware dispatch method directly. Total tests: 496 (481 original + 15 new)."
 }
