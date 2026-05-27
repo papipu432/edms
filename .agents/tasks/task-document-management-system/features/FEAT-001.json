@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Project scaffolding, FastAPI application with document groups/folders CRUD, document upload with encrypted PDF storage, and SQLite database setup. This establishes the core web application, file storage, and database layer.",
+  "status": "in_progress",
+  "steps": [
+    "Initialize project with pyproject.toml using 'uv init' in /projects/sandbox/edms. Set Python version to 3.11 via .python-version file. Add dependencies: fastapi, uvicorn[standard], sqlalchemy[asyncio], aiosqlite, python-multipart, pikepdf, pydantic-settings, alembic, httpx (dev).",
+    "Create app/ package structure: app/__init__.py, app/main.py (FastAPI app factory with lifespan for DB init), app/core/__init__.py, app/core/config.py (Settings via pydantic-settings: DATABASE_URL, STORAGE_PATH, WIKI_PATH, PDF_ENCRYPTION_PASSWORD, OPENAI_API_KEY, CHUNK_SIZE), app/core/database.py (async SQLAlchemy engine + sessionmaker + get_db dependency).",
+    "Create app/models/__init__.py, app/models/group.py (Group model: id, name, description, created_at, updated_at), app/models/document.py (Document model: id, group_id FK, original_filename, storage_path, encrypted_pdf_path, markdown_path, file_type, file_size, status enum [uploaded, processing, processed, failed], summary, keywords JSON, created_at, updated_at).",
+    "Create app/schemas/__init__.py, app/schemas/group.py (GroupCreate, GroupUpdate, GroupResponse Pydantic models), app/schemas/document.py (DocumentResponse, DocumentListResponse Pydantic models).",
+    "Create app/api/__init__.py, app/api/groups.py (CRUD router: POST /api/groups, GET /api/groups, GET /api/groups/{id}, PUT /api/groups/{id}, DELETE /api/groups/{id}), app/api/documents.py (POST /api/groups/{group_id}/documents for upload with UploadFile, GET /api/documents, GET /api/documents/{id}, DELETE /api/documents/{id}, GET /api/documents/{id}/download for encrypted PDF download).",
+    "Create app/services/__init__.py, app/services/storage.py (StorageService: save_upload, encrypt_pdf using pikepdf, get_file_path, delete_file). Storage layout: storage/{group_id}/originals/, storage/{group_id}/encrypted/, storage/{group_id}/markdown/, storage/{group_id}/images/.",
+    "Create app/api/router.py that includes all sub-routers. Wire everything in app/main.py with CORS middleware enabled.",
+    "Create tests/__init__.py, tests/conftest.py (async pytest fixtures: test client with httpx.AsyncClient, test database with in-memory SQLite, temp storage directory), tests/test_groups.py (test CRUD operations for groups), tests/test_documents.py (test document upload with a sample PDF fixture, test download, test list).",
+    "Create a sample test fixture: tests/fixtures/ directory with a small valid PDF file generated programmatically in conftest.py for testing upload.",
+    "Add a .gitignore file for Python projects (include storage/, wiki/, *.db, __pycache__, .env, .venv)."
+  ],
+  "acceptance_criteria": [
+    "Running 'uv sync' installs all dependencies without errors",
+    "Running 'uv run pytest tests/ -v' passes all tests",
+    "POST /api/groups creates a group and returns it with an id",
+    "POST /api/groups/{group_id}/documents with a PDF file uploads, encrypts, and stores the document",
+    "GET /api/documents/{id}/download returns the encrypted PDF",
+    "All uploaded documents have an encrypted PDF copy in storage/{group_id}/encrypted/",
+    "Running 'uv run ruff check app/' passes with no errors"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

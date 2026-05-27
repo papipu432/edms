@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Document processing pipeline: preprocessing (deskew, enhance, denoise for images), conversion to Markdown/CSV/Images using pytesseract and python-docx, and background task orchestration. This implements the core document transformation pipeline that runs after upload.",
+  "status": "pending",
+  "steps": [
+    "Add dependencies to pyproject.toml: Pillow, pytesseract, python-docx, pymupdf (fitz for PDF text/image extraction), pandas (for CSV table output). Note: pytesseract requires tesseract-ocr system package - add a note in README but handle gracefully if not available.",
+    "Create app/services/preprocessing.py (PreprocessingService): deskew_image (using Pillow rotate with OSD from pytesseract or simple heuristic), enhance_image (contrast enhancement with PIL.ImageEnhance), denoise_image (median filter with PIL.ImageFilter). Each takes PIL.Image and returns PIL.Image. Add a preprocess_pipeline method that chains all three.",
+    "Create app/services/converter.py (ConversionService): convert_pdf (extract text via pymupdf, extract images, extract tables as CSV), convert_docx (extract text/images via python-docx), convert_image (OCR via pytesseract with preprocessing). Each returns a ConversionResult dataclass with: markdown_content (str), tables (list of CSV strings), images (list of PIL.Image or paths), metadata (dict).",
+    "Create app/services/pipeline.py (PipelineService): orchestrates the full processing flow. Takes a document ID, determines file type, runs preprocessing if image/scanned, runs conversion, saves markdown to storage/{group_id}/markdown/{doc_id}.md, saves extracted images to storage/{group_id}/images/{doc_id}/, saves tables as CSV files, updates document status in DB.",
+    "Integrate pipeline into document upload: in app/api/documents.py, after successful upload, launch pipeline as a FastAPI BackgroundTask. Update document status to 'processing' immediately, then 'processed' or 'failed' after pipeline completes.",
+    "Add GET /api/documents/{id}/markdown endpoint that returns the converted markdown content.",
+    "Add GET /api/documents/{id}/status endpoint for checking processing status.",
+    "Create tests/test_pipeline.py: test preprocessing functions with a synthetic image (create a PIL Image with text), test PDF conversion with the fixture PDF, test DOCX conversion with a programmatically-created DOCX fixture, test pipeline orchestration with mocked services, test status transitions.",
+    "Handle tesseract not being installed gracefully: if pytesseract raises an error, fall back to pymupdf text extraction for PDFs, and set a warning in the document metadata. Log the error but don't crash."
+  ],
+  "acceptance_criteria": [
+    "Running 'uv run pytest tests/test_pipeline.py -v' passes all tests",
+    "Uploading a PDF triggers background processing and eventually sets status to 'processed'",
+    "After processing, a markdown file exists at the expected storage path",
+    "GET /api/documents/{id}/markdown returns markdown content for a processed document",
+    "GET /api/documents/{id}/status returns current processing status",
+    "If tesseract is not installed, PDF processing still works via pymupdf fallback",
+    "Image preprocessing functions (deskew, enhance, denoise) accept and return PIL Images without error"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

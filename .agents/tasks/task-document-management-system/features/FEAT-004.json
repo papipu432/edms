@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "LLM Wiki system based on Karpathy's pattern: incrementally build and maintain a persistent wiki of interlinked markdown files. When documents are ingested, the system extracts key information and integrates it into the wiki - updating entity pages, topic summaries, the index, and the operation log. Includes wiki query and lint operations.",
+  "status": "pending",
+  "steps": [
+    "Create app/services/wiki.py (WikiService): manages the wiki directory structure at {WIKI_PATH}/. The wiki has: index.md (content catalog), log.md (chronological operation log), entities/ (entity pages), topics/ (concept/topic pages), summaries/ (document summaries). Initialize wiki structure on first use.",
+    "Implement WikiService.ingest(doc_id, markdown_content, summary, keywords, metadata): This is called after document processing. Steps: (1) Create/update summaries/{doc_id}.md with document summary. (2) Use LLM to extract entities and topics from the content. (3) For each entity, create or update entities/{entity_slug}.md - if page exists, merge new information using LLM. (4) For each topic, create or update topics/{topic_slug}.md. (5) Update index.md with new entries. (6) Append operation to log.md with timestamp. Use LLM calls with specific prompts for entity extraction and page merging.",
+    "Implement WikiService.query(question: str) -> str: Search wiki pages (index.md first, then relevant entity/topic pages), gather context, and use LLM to synthesize an answer with citations to wiki pages.",
+    "Implement WikiService.lint() -> list[LintIssue]: Health-check the wiki. Check for: orphan pages (not in index.md), broken cross-references (links to non-existent pages), stale entries (documents that were deleted but still referenced). Return list of issues found.",
+    "Create app/schemas/wiki.py: WikiPageResponse, WikiIndexResponse, WikiQueryRequest, WikiQueryResponse, WikiLintResponse, LintIssue Pydantic models.",
+    "Create app/api/wiki.py: GET /api/wiki/index (return index.md content and parsed page list), GET /api/wiki/pages/{page_path} (return specific wiki page content), POST /api/wiki/query (ask a question against the wiki), POST /api/wiki/lint (run lint and return issues), GET /api/wiki/log (return recent operations from log.md).",
+    "Integrate wiki ingest into the processing pipeline: in app/services/pipeline.py, after summarization and vector indexing, call wiki_service.ingest() to update the wiki with the new document's information.",
+    "Wire wiki router into app/api/router.py.",
+    "Create tests/test_wiki.py: test wiki initialization creates directory structure, test ingest creates summary and updates index (mock LLM calls), test query searches wiki and returns answer, test lint detects orphan pages, test log records operations. Use tmp_path fixture for wiki directory.",
+    "Create a README.md at the project root documenting: project overview, architecture diagram (the pipeline from the user's request), setup instructions (pyenv, uv sync, env vars needed), API endpoints summary, how to run (uvicorn app.main:app), how to run tests, the LLM Wiki concept explanation."
+  ],
+  "acceptance_criteria": [
+    "Running 'uv run pytest tests/ -v' passes all tests including wiki tests",
+    "After document processing, wiki/index.md is created and contains the document entry",
+    "After document processing, wiki/log.md records the ingest operation with timestamp",
+    "After document processing, wiki/summaries/{doc_id}.md exists with document summary",
+    "GET /api/wiki/index returns the wiki index content",
+    "POST /api/wiki/query returns an answer synthesized from wiki pages",
+    "POST /api/wiki/lint detects orphan pages not listed in index",
+    "Wiki pages contain cross-references (markdown links) to related entity/topic pages",
+    "README.md exists with setup instructions and API documentation"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
