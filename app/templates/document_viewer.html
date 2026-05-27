@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Document Viewer - EDMS{% endblock %}
+{% block content %}
+<div class="flex gap-6">
+    <!-- Left: Document content -->
+    <div class="flex-1">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h1 id="doc-title" class="text-xl font-bold mb-4">Loading...</h1>
+            <div id="doc-content" class="prose max-w-none">
+                <p class="text-gray-500">Loading document content...</p>
+            </div>
+        </div>
+        <!-- Metadata bar -->
+        <div class="mt-4 bg-white rounded-lg shadow p-4">
+            <div class="flex gap-4 text-sm">
+                <div><span class="font-medium">Status:</span> <span id="doc-status" class="text-gray-600">-</span></div>
+                <div><span class="font-medium">Keywords:</span> <span id="doc-keywords" class="text-gray-600">-</span></div>
+            </div>
+            <div class="mt-2 text-sm">
+                <span class="font-medium">Summary:</span> <span id="doc-summary" class="text-gray-600">-</span>
+            </div>
+        </div>
+    </div>
+    <!-- Right: Annotations panel -->
+    <div class="w-80 flex-shrink-0">
+        <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-4">Annotations</h2>
+            <div id="annotations-list" class="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                <p class="text-sm text-gray-500">No annotations yet</p>
+            </div>
+            <hr class="my-4">
+            <h3 class="text-sm font-medium mb-2">Add Annotation</h3>
+            <form id="annotation-form" class="space-y-2">
+                <textarea name="text" rows="3" required placeholder="Enter annotation text..." class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></textarea>
+                <div class="flex gap-2">
+                    <input type="number" name="start_offset" placeholder="Start" class="w-1/2 border border-gray-300 rounded-md px-2 py-1 text-sm">
+                    <input type="number" name="end_offset" placeholder="End" class="w-1/2 border border-gray-300 rounded-md px-2 py-1 text-sm">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md text-sm hover:bg-blue-700">Add Annotation</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const documentId = {{ document_id }};
+
+async function loadDocument() {
+    const resp = await authFetch(`/api/documents/${documentId}`);
+    if (!resp.ok) return;
+    const doc = await resp.json();
+    document.getElementById('doc-title').textContent = doc.original_filename;
+    document.getElementById('doc-status').textContent = doc.status;
+    document.getElementById('doc-summary').textContent = doc.summary || 'No summary available';
+    document.getElementById('doc-keywords').textContent = doc.keywords ? doc.keywords.join(', ') : 'None';
+
+    if (doc.markdown_path) {
+        const mdResp = await authFetch(`/api/documents/${documentId}/markdown`);
+        if (mdResp.ok) {
+            const mdData = await mdResp.json();
+            document.getElementById('doc-content').innerHTML = `<pre class="whitespace-pre-wrap text-sm">${mdData.content || ''}</pre>`;
+        }
+    } else {
+        document.getElementById('doc-content').innerHTML = '<p class="text-gray-500">No markdown content available</p>';
+    }
+}
+
+async function loadAnnotations() {
+    const resp = await authFetch(`/api/documents/${documentId}/annotations`);
+    if (!resp.ok) return;
+    const annotations = await resp.json();
+    const list = document.getElementById('annotations-list');
+    if (annotations.length === 0) {
+        list.innerHTML = '<p class="text-sm text-gray-500">No annotations yet</p>';
+        return;
+    }
+    list.innerHTML = annotations.map(a => `
+        <div class="border-l-4 border-blue-400 pl-3 py-1">
+            <p class="text-sm">${a.text}</p>
+            <p class="text-xs text-gray-400 mt-1">${new Date(a.created_at).toLocaleString()}${a.start_offset != null ? ` [${a.start_offset}-${a.end_offset}]` : ''}</p>
+        </div>
+    `).join('');
+}
+
+document.getElementById('annotation-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        text: form.text.value,
+        start_offset: form.start_offset.value ? parseInt(form.start_offset.value) : null,
+        end_offset: form.end_offset.value ? parseInt(form.end_offset.value) : null
+    };
+    const resp = await authFetch(`/api/documents/${documentId}/annotations`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    if (resp.ok) {
+        form.reset();
+        loadAnnotations();
+    }
+});
+
+loadDocument();
+loadAnnotations();
+</script>
+{% endblock %}

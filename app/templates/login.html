@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Login - EDMS{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto mt-16">
+    <div class="bg-white p-8 rounded-lg shadow">
+        <h1 class="text-2xl font-bold mb-6 text-center">EDMS Login</h1>
+        <div id="error-msg" class="hidden bg-red-100 text-red-700 p-3 rounded mb-4"></div>
+        <form id="login-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Username</label>
+                <input type="text" name="username" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Password</label>
+                <input type="password" name="password" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">Login</button>
+        </form>
+        <p class="mt-4 text-center text-sm text-gray-600">
+            No account? <a href="/register" class="text-blue-600 hover:underline">Register</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = { username: form.username.value, password: form.password.value };
+    const resp = await fetch('/api/auth/login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+    });
+    if (resp.ok) {
+        const result = await resp.json();
+        localStorage.setItem('edms_token', result.access_token);
+        window.location.href = '/dashboard';
+    } else {
+        const err = document.getElementById('error-msg');
+        err.textContent = 'Invalid credentials';
+        err.classList.remove('hidden');
+    }
+});
+</script>
+{% endblock %}

@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Add Jinja2-rendered HTML frontend pages for document workflow: login, dashboard, document viewer with annotations, review/approval workflow, cross-referenced document viewing, and user/role management (admin).",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add dependency via 'uv add': jinja2. Run 'uv sync'.",
     "Create app/templates/ directory structure: app/templates/base.html (base template with nav, CSS via Tailwind CDN, common JS), app/templates/login.html, app/templates/dashboard.html, app/templates/document_viewer.html, app/templates/workflow.html, app/templates/crossref.html, app/templates/admin_users.html.",
