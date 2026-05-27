@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-003",
+  "type": "docs",
+  "description": "Create comprehensive documentation in docs/ directory - 11 markdown files covering API cookbook, architecture, data dictionary, developer guide, how-to, operations runbook, project overview, security, troubleshooting, user guide, and wiki system documentation.",
+  "status": "completed",
+  "steps": [
+    "Create docs/README.md - Project overview: what EDMS is, key capabilities (document management, LLM wiki, RAG search, RBAC, encryption, bulk operations, lifecycle management), technology stack (FastAPI, SQLAlchemy, ChromaDB, LangChain, OpenAI/Ollama), quick start commands, link to other docs.",
+    "Create docs/ARCHITECTURE.md - System architecture: three-layer pipeline diagram (from root README), component relationships, database schema overview (all tables and relationships), service layer design, API layer structure, background task processing, LLM integration architecture, vector DB integration, encryption layer (AES-256-GCM envelope encryption, Shamir Secret Sharing), RBAC architecture.",
+    "Create docs/DATA_DICTIONARY.md - All SQLAlchemy models documented: Document (fields, relationships, enums), Group (fields, parent hierarchy), WorkflowEntry (actions), DocumentLifecycle (states, transitions), User (RBAC relations), Role/Permission/RolePermission/UserRole, OrgUnit/OrgPosition/OrgGrade/OrgUserAssignment, FolderAssignment, Annotation, EncryptionKey/KeyShare, BackupConfig/BackupJob/BackupSchedule, SecurityAlert/MonitoringConfig, LdapConfig. Include enum values, field types, constraints, and relationships.",
+    "Create docs/DEVELOPER_GUIDE.md - Prerequisites (Python 3.11+, uv, pyenv), installation steps, environment variables (.env file setup), running the server, running tests, linting with ruff, project structure walkthrough, how to add new API endpoints (step by step with router registration), how to add new models, how to add new tests, database migrations with alembic, coding conventions (SQLAlchemy 2.0 style, Pydantic v2, async patterns).",
+    "Create docs/API_COOKBOOK.md - Curl examples for all endpoints: auth (login, register, get token), groups CRUD, documents (upload, list, download, status, markdown), bulk operations (bulk upload, bulk approve, bulk signoff), lifecycle (create, transition, alerts), workflow (submit_review, approve, reject), search, wiki (query, index, pages), RBAC (roles, permissions, user-roles), annotations. Include request/response JSON examples.",
+    "Create docs/HOWTO.md - Common tasks: How to upload a document, how to perform bulk upload with auto-folder creation, how to set up document lifecycle, how to approve documents in bulk, how to configure email alerts, how to add a new user with roles, how to set up LDAP sync, how to configure encryption, how to perform backup/restore, how to search documents, how to use the wiki chat.",
+    "Create docs/OPERATIONS_RUNBOOK.md - Deployment: production setup (uvicorn with gunicorn, environment variables), Docker deployment, database setup and migrations, monitoring (health checks, log files), backup procedures (MinIO, Restic), disaster recovery, incident response playbook, performance tuning, scaling considerations, ChromaDB maintenance.",
+    "Create docs/SECURITY.md - Security architecture: authentication (JWT tokens, session cookies), authorization (RBAC with roles/permissions/folder assignments), encryption at rest (AES-256-GCM envelope encryption, KEK/DEK model), Shamir Secret Sharing for key recovery, PDF password encryption, ransomware detection, LDAP integration security, threat model, security best practices, hardening checklist.",
+    "Create docs/TROUBLESHOOTING.md - Common issues: database locked errors, migration failures, OpenAI API key issues, ChromaDB connection problems, PDF processing failures, LDAP connection issues, permission denied errors, file upload size limits, background task failures, search index issues. Include symptoms, causes, and solutions for each.",
+    "Create docs/USER_GUIDE.md - End-user guide: logging in, navigating the dashboard, uploading documents (single and bulk), organizing documents in groups/folders, viewing document status, using the workflow (submit for review, approve), using annotations, searching documents, chatting with the wiki, managing your profile.",
+    "Create docs/WIKI.md - LLM Wiki system documentation: concept (Karpathy's pattern), how the wiki grows with document ingestion, wiki structure (index.md, entities/, topics/, summaries/, log.md), wiki operations (entity extraction, page merging, cross-referencing), querying the wiki, wiki health checks (lint), configuration (OPENAI_API_KEY, WIKI_PATH, LLM_PROVIDER), Ollama vs OpenAI setup."
+  ],
+  "acceptance_criteria": [
+    "All 11 markdown files exist in docs/ directory",
+    "Each file contains substantive, accurate content based on the actual codebase (not placeholder text)",
+    "API_COOKBOOK.md contains working curl examples that match the actual API endpoints",
+    "DATA_DICTIONARY.md documents all models including the new lifecycle models from FEAT-002",
+    "ARCHITECTURE.md includes the bulk operations and lifecycle components",
+    "DEVELOPER_GUIDE.md setup instructions match the actual project (uv sync, pyenv, etc.)",
+    "Files cross-reference each other where appropriate"
+  ],
+  "verification": [
+    "Verify all 11 files exist: ls docs/",
+    "Verify no empty files: find docs/ -name '*.md' -empty",
+    "uv run pytest tests/ -v (existing tests still pass - docs don't break anything)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 11 documentation files created successfully. Total 5298 lines of content. All 292 tests still pass. Linter passes."
+}

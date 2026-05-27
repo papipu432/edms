@@ -1,0 +1,14 @@
+{
+  "task_id": "task-bulk-lifecycle-docs",
+  "task_description": "Add bulk document operations (upload, approve, signoff with auto-folder creation), document lifetime/lifecycle state machine with email notifications, and comprehensive documentation (11 markdown files in docs/)",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 297 tests pass (268 baseline + 9 bulk + 20 lifecycle). Ruff lint passes. v2 review APPROVED. Review noted 3 non-blocking improvements (async SMTP, email fallback logging, email service unit tests) for future enhancement."
+  }
+}
