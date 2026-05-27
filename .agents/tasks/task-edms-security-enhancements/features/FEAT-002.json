@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Add HTML settings page for Local LLM (Ollama) configuration. Allows toggling between cloud LLM (OpenAI) and local LLM (Ollama), configuring endpoint URL, listing pulled models, pulling new models, and selecting models for different tasks (summarization, keywords, embeddings, chat/RAG).",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Add LLM settings to app/core/config.py: LLM_PROVIDER (openai|ollama), OLLAMA_BASE_URL (default http://localhost:11434), OLLAMA_MODEL_SUMMARIZE, OLLAMA_MODEL_KEYWORDS, OLLAMA_MODEL_EMBEDDINGS, OLLAMA_MODEL_CHAT.",
     "Step 2 - Create app/services/ollama.py service that wraps Ollama API calls: list_models (GET /api/tags), pull_model (POST /api/pull with streaming), get_model_status, generate_completion, generate_embeddings. Use httpx for async HTTP calls.",
@@ -28,5 +28,5 @@
     "uv run ruff check app/ tests/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 181 tests pass (170 existing + 11 new). Lint clean. Used require_permission('settings', 'manage') for all endpoints which works with admin role bypass in security.py. httpx was already in dev deps but added to main deps for Ollama service runtime use. Tests mock at OllamaService method level for clean async mocking. The settings update is runtime-only (not persisted to .env file)."
 }
