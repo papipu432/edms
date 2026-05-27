@@ -220,3 +220,36 @@ def get_kms_provider() -> KMSProvider:
         return CosmianKMS()
     else:
         raise ValueError(f"Unknown KMS provider: {provider}")
+
+
+def rate_limited_unwrap(wrapped_blob: bytes, client_ip: str = "unknown") -> bytes:
+    """Unwrap a key with rate limiting per client IP.
+
+    Checks the KMS rate limiter before performing the unwrap operation.
+    If the rate limit is exceeded, logs a warning and raises KMSError.
+
+    Args:
+        wrapped_blob: The wrapped key blob to unwrap.
+        client_ip: The client IP address for rate limiting.
+
+    Returns:
+        The unwrapped key bytes.
+
+    Raises:
+        KMSError: If the rate limit is exceeded.
+    """
+    from app.services.error_handling import KMSError
+    from app.services.security_monitoring import get_kms_rate_limiter
+
+    rate_limiter = get_kms_rate_limiter()
+
+    if not rate_limiter.check_rate_limit(client_ip):
+        logger.warning(
+            "KMS rate limit exceeded for IP %s. Blocking unwrap operation.",
+            client_ip,
+        )
+        raise KMSError("Rate limit exceeded")
+
+    rate_limiter.record_call(client_ip)
+    provider = get_kms_provider()
+    return provider.unwrap_key(wrapped_blob)

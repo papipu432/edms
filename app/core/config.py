@@ -81,6 +81,13 @@ class Settings(BaseSettings):
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
     CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 30
 
+    # KMS rate limiting
+    KMS_RATE_LIMIT_MAX_CALLS: int = 10
+    KMS_RATE_LIMIT_WINDOW_SECONDS: int = 60
+
+    # Security monitoring webhook
+    SECURITY_MONITORING_WEBHOOK_SECRET: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
