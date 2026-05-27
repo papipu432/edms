@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Document Relationship Management - Cross-reference graph between documents with relationship types (parent, child, related, supersedes, references). Orphaned document detection, relationship visualization API returning graph data, and dependency tracking.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1: Create app/models/relationship.py with a DocumentRelationship model: id, source_document_id (FK to documents.id), target_document_id (FK to documents.id), relationship_type (enum: parent, child, related, supersedes, references), description (optional text), created_by (FK to users.id), created_at. Add a unique constraint on (source_document_id, target_document_id, relationship_type).",
     "Step 2: Create app/schemas/relationship.py with Pydantic schemas: RelationshipCreate(source_document_id, target_document_id, relationship_type, description), RelationshipResponse(id, source_document_id, target_document_id, relationship_type, description, created_by, created_at), RelationshipGraphResponse(nodes: list of {id, name, group_id}, edges: list of {source, target, type}), OrphanedDocumentResponse(document_id, document_name, issue: str).",
