@@ -268,6 +268,13 @@ class WikiService:
 
         wiki_context = "\n".join(context_parts)
 
+        # Truncate context to avoid exceeding LLM token limits.
+        # 100,000 characters is roughly 25,000 tokens, which fits within
+        # most model context windows while leaving room for the prompt.
+        max_context_size = 100_000
+        if len(wiki_context) > max_context_size:
+            wiki_context = wiki_context[:max_context_size]
+
         # Use chat_completion to answer
         messages = [{"role": "user", "content": question}]
         answer = chat_completion(messages, context=wiki_context)
@@ -349,6 +356,9 @@ class WikiService:
     def get_page(self, page_path: str) -> str | None:
         """Return content of a specific wiki page."""
         full_path = self.wiki_path / page_path
+        # Prevent path traversal: ensure the resolved path stays inside wiki_path
+        if not full_path.resolve().is_relative_to(self.wiki_path.resolve()):
+            return None
         if full_path.exists() and full_path.suffix == ".md":
             return full_path.read_text(encoding="utf-8")
         return None

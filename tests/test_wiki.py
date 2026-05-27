@@ -317,6 +317,38 @@ class TestWikiGetters:
         content = service.get_page("entities/nonexistent.md")
         assert content is None
 
+    def test_get_page_path_traversal_blocked(self, tmp_path: Path):
+        """Test get_page rejects path traversal attempts."""
+        wiki_path = tmp_path / "wiki"
+
+        with patch("app.services.wiki.get_llm_client", return_value=None):
+            service = WikiService(wiki_path=str(wiki_path))
+
+        # Create a .md file outside the wiki directory
+        secret_file = tmp_path / "secret.md"
+        secret_file.write_text("SECRET CONTENT", encoding="utf-8")
+
+        # Attempt path traversal
+        content = service.get_page("../secret.md")
+        assert content is None
+
+    def test_get_page_path_traversal_nested(self, tmp_path: Path):
+        """Test get_page rejects nested path traversal attempts."""
+        wiki_path = tmp_path / "wiki"
+
+        with patch("app.services.wiki.get_llm_client", return_value=None):
+            service = WikiService(wiki_path=str(wiki_path))
+
+        # Create a .md file outside the wiki directory in a nested path
+        other_dir = tmp_path / "other"
+        other_dir.mkdir()
+        secret_file = other_dir / "data.md"
+        secret_file.write_text("SENSITIVE DATA", encoding="utf-8")
+
+        # Attempt nested path traversal
+        content = service.get_page("entities/../../other/data.md")
+        assert content is None
+
     def test_get_log(self, tmp_path: Path):
         """Test get_log returns log entries."""
         wiki_path = tmp_path / "wiki"

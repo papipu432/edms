@@ -97,6 +97,11 @@ async def chat(
 
     context = "\n\n---\n\n".join(context_parts)
 
+    # Truncate context to prevent exceeding LLM token limits
+    max_context_size = 50_000
+    if len(context) > max_context_size:
+        context = context[:max_context_size]
+
     # Build messages
     messages = []
     if request.history:

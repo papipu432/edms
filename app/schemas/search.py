@@ -1,10 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SearchRequest(BaseModel):
     query: str
     group_id: int | None = None
-    top_k: int = 5
+    top_k: int = Field(default=5, ge=1, le=20)
 
 
 class SearchResult(BaseModel):
