@@ -1,7 +1,7 @@
 {
   "task_id": "task-document-management-system",
   "task_description": "Create a Document Management System using Python FastAPI. Supports document upload to groups/folders, preprocessing (deskew, enhance, denoise), conversion to Markdown/CSV/Images, encrypted PDF storage, LLM summarization and keyword extraction, vector DB indexing for RAG search, RAG chat interface, and an LLM Wiki system that incrementally builds a structured knowledge base from ingested documents.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
   "blocked_reason": null,
   "verification": {
@@ -9,6 +9,6 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "uv sync successful, all 80 tests pass, ruff check clean. Tests exercise real logic (PIL operations, PDF/DOCX generation, ChromaDB indexing, file system operations) with external services (OpenAI, tesseract) properly mocked."
+    "summary": "uv sync successful, all 82 tests pass (including 2 security tests added during review), ruff check clean. Semantic review v2 APPROVED."
   }
 }
