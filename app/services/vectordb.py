@@ -9,12 +9,41 @@ logger = logging.getLogger(__name__)
 CHROMA_DB_PATH = settings.CHROMA_DB_PATH
 
 
+def _create_chroma_client(
+    persist_directory: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
+    auth_token: str | None = None,
+) -> chromadb.ClientAPI:
+    """Create a ChromaDB client based on configuration.
+
+    If host is provided, creates an HTTP client connecting to a remote ChromaDB server.
+    Otherwise, creates a PersistentClient using local file storage.
+    """
+    chroma_host = host if host is not None else settings.CHROMA_HOST
+    chroma_port = port if port is not None else settings.CHROMA_PORT
+    chroma_token = auth_token if auth_token is not None else settings.CHROMA_AUTH_TOKEN
+
+    if chroma_host:
+        headers: dict[str, str] = {}
+        if chroma_token:
+            headers["Authorization"] = f"Bearer {chroma_token}"
+        logger.info("Connecting to ChromaDB at %s:%d", chroma_host, chroma_port)
+        return chromadb.HttpClient(
+            host=chroma_host,
+            port=chroma_port,
+            headers=headers,
+        )
+
+    path = persist_directory or CHROMA_DB_PATH
+    return chromadb.PersistentClient(path=path)
+
+
 class VectorDBService:
     """Service for managing document embeddings in ChromaDB."""
 
     def __init__(self, persist_directory: str | None = None) -> None:
-        path = persist_directory or CHROMA_DB_PATH
-        self.client = chromadb.PersistentClient(path=path)
+        self.client = _create_chroma_client(persist_directory=persist_directory)
         self.collection = self.client.get_or_create_collection(
             name="documents",
             metadata={"hnsw:space": "cosine"},

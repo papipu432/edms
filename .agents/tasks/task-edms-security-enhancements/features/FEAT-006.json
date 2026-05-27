@@ -2,7 +2,7 @@
   "id": "FEAT-006",
   "type": "feat",
   "description": "Add hardened Docker Compose configuration for ChromaDB with authentication, security options (read-only filesystem, no-new-privileges), and localhost-only binding. Also update the main docker-compose.yml if it exists.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Step 1 - Create docker-compose.chroma.yml with the hardened ChromaDB service: chromadb/chroma:latest image, container name chromadb-dms, port 127.0.0.1:8000:8000 (localhost only), volumes for chroma_data and chroma_config, environment variables for token auth provider and persistence, security_opt no-new-privileges, read_only true, tmpfs /tmp:size=100M,mode=1777.",
     "Step 2 - Create a chroma_config/ directory with a placeholder token.txt file (with a generated random token) and a README explaining how to set the auth token.",

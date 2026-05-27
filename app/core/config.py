@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     CHUNK_SIZE: int = 1000
     CHROMA_DB_PATH: str = "./chroma_db"
+    CHROMA_HOST: str = ""
+    CHROMA_PORT: int = 8000
+    CHROMA_AUTH_TOKEN: str = ""
     SECRET_KEY: str = "changeme-secret-key-for-jwt"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ALGORITHM: str = "HS256"
