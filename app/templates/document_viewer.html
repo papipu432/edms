@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Document Viewer - EDMS{% endblock %}
 {% block content %}
+<div id="breadcrumb-container" class="mb-4 hidden">
+    <nav class="flex text-sm text-gray-500" aria-label="Breadcrumb">
+        <ol id="breadcrumb-list" class="inline-flex items-center space-x-1"></ol>
+    </nav>
+</div>
 <div class="flex gap-6">
     <!-- Left: Document content -->
     <div class="flex-1">
@@ -102,7 +107,37 @@ document.getElementById('annotation-form').addEventListener('submit', async (e) 
     }
 });
 
+async function loadBreadcrumbs(groupId) {
+    if (!groupId) return;
+    try {
+        const resp = await authFetch('/api/groups/' + groupId + '/breadcrumbs');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const items = data.items || [];
+        if (items.length === 0) return;
+        const ol = document.getElementById('breadcrumb-list');
+        ol.innerHTML = '<li><a href="/dashboard" class="text-blue-600 hover:underline">Home</a></li>' +
+            items.map((item, idx) => {
+                const isLast = idx === items.length - 1;
+                return '<li class="flex items-center"><span class="mx-1 text-gray-400">/</span>' +
+                    (isLast
+                        ? '<span class="text-gray-700">' + escapeHtml(item.name) + '</span>'
+                        : '<a href="/dashboard" class="text-blue-600 hover:underline">' + escapeHtml(item.name) + '</a>')
+                    + '</li>';
+            }).join('');
+        document.getElementById('breadcrumb-container').classList.remove('hidden');
+    } catch (e) { /* ignore */ }
+}
+
+async function initBreadcrumbs() {
+    const resp = await authFetch('/api/documents/' + documentId);
+    if (!resp.ok) return;
+    const doc = await resp.json();
+    if (doc.group_id) loadBreadcrumbs(doc.group_id);
+}
+
 loadDocument();
 loadAnnotations();
+initBreadcrumbs();
 </script>
 {% endblock %}

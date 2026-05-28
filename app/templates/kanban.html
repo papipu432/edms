@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Kanban Board - EDMS{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold">Document Lifecycle Board</h1>
+    <p class="text-sm text-gray-500 mt-1">Drag documents between columns to transition their lifecycle state.</p>
+</div>
+<div id="kanban-board" class="flex gap-4 overflow-x-auto pb-4">
+    <div class="kanban-column min-w-[250px] flex-1 bg-gray-50 rounded-lg p-3" data-state="draft">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-gray-400"></span> Draft
+            <span class="text-xs text-gray-400 ml-auto" data-count="draft">0</span>
+        </h3>
+        <div class="kanban-cards space-y-2 min-h-[200px]" data-state="draft"
+             ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)" ondrop="handleKanbanDrop(event, 'draft')"></div>
+    </div>
+    <div class="kanban-column min-w-[250px] flex-1 bg-gray-50 rounded-lg p-3" data-state="in_review">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-yellow-400"></span> In Review
+            <span class="text-xs text-gray-400 ml-auto" data-count="in_review">0</span>
+        </h3>
+        <div class="kanban-cards space-y-2 min-h-[200px]" data-state="in_review"
+             ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)" ondrop="handleKanbanDrop(event, 'in_review')"></div>
+    </div>
+    <div class="kanban-column min-w-[250px] flex-1 bg-gray-50 rounded-lg p-3" data-state="approved">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-green-400"></span> Approved
+            <span class="text-xs text-gray-400 ml-auto" data-count="approved">0</span>
+        </h3>
+        <div class="kanban-cards space-y-2 min-h-[200px]" data-state="approved"
+             ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)" ondrop="handleKanbanDrop(event, 'approved')"></div>
+    </div>
+    <div class="kanban-column min-w-[250px] flex-1 bg-gray-50 rounded-lg p-3" data-state="up_to_date">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-blue-400"></span> Up To Date
+            <span class="text-xs text-gray-400 ml-auto" data-count="up_to_date">0</span>
+        </h3>
+        <div class="kanban-cards space-y-2 min-h-[200px]" data-state="up_to_date"
+             ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)" ondrop="handleKanbanDrop(event, 'up_to_date')"></div>
+    </div>
+    <div class="kanban-column min-w-[250px] flex-1 bg-gray-50 rounded-lg p-3" data-state="needs_re_review">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-orange-400"></span> Needs Re-Review
+            <span class="text-xs text-gray-400 ml-auto" data-count="needs_re_review">0</span>
+        </h3>
+        <div class="kanban-cards space-y-2 min-h-[200px]" data-state="needs_re_review"
+             ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)" ondrop="handleKanbanDrop(event, 'needs_re_review')"></div>
+    </div>
+    <div class="kanban-column min-w-[250px] flex-1 bg-gray-50 rounded-lg p-3" data-state="expired">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-red-400"></span> Expired
+            <span class="text-xs text-gray-400 ml-auto" data-count="expired">0</span>
+        </h3>
+        <div class="kanban-cards space-y-2 min-h-[200px]" data-state="expired"
+             ondragover="handleKanbanDragOver(event)" ondragleave="handleKanbanDragLeave(event)" ondrop="handleKanbanDrop(event, 'expired')"></div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadKanbanBoard() {
+    const resp = await authFetch('/api/kanban');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const columns = data.columns || {};
+
+    const states = ['draft', 'in_review', 'approved', 'up_to_date', 'needs_re_review', 'expired'];
+    states.forEach(state => {
+        const cards = columns[state] || [];
+        const container = document.querySelector('.kanban-cards[data-state="' + state + '"]');
+        const countEl = document.querySelector('[data-count="' + state + '"]');
+        if (countEl) countEl.textContent = cards.length;
+        if (!container) return;
+        container.innerHTML = cards.map(card => `
+            <div class="kanban-card bg-white rounded shadow p-3 cursor-move border border-transparent hover:border-blue-200"
+                 draggable="true"
+                 data-document-id="${card.document_id}"
+                 ondragstart="handleKanbanDragStart(event, ${card.document_id})">
+                <p class="text-sm font-medium truncate">${escapeHtml(card.filename)}</p>
+                <div class="flex justify-between items-center mt-2 text-xs text-gray-400">
+                    <span>${card.updated_at ? new Date(card.updated_at).toLocaleDateString() : ''}</span>
+                    <a href="/documents/${card.document_id}/view" class="text-blue-500 hover:underline" onclick="event.stopPropagation()">View</a>
+                </div>
+            </div>
+        `).join('');
+    });
+}
+
+function handleKanbanDragStart(e, documentId) {
+    e.dataTransfer.setData('text/plain', documentId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.currentTarget.classList.add('opacity-50');
+}
+
+function handleKanbanDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('bg-blue-50');
+}
+
+function handleKanbanDragLeave(e) {
+    e.currentTarget.classList.remove('bg-blue-50');
+}
+
+async function handleKanbanDrop(e, targetState) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('bg-blue-50');
+    const documentId = e.dataTransfer.getData('text/plain');
+    if (!documentId) return;
+
+    const resp = await authFetch('/api/documents/' + documentId + '/lifecycle/transition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_state: targetState })
+    });
+    // Reload board regardless of success to restore proper state
+    loadKanbanBoard();
+}
+
+document.addEventListener('dragend', function(e) {
+    if (e.target.classList) e.target.classList.remove('opacity-50');
+});
+
+loadKanbanBoard();
+</script>
+{% endblock %}

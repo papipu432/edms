@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - EDMS{% endblock %}
 {% block content %}
+<div id="breadcrumb-container" class="mb-4 hidden">
+    <nav class="flex text-sm text-gray-500" aria-label="Breadcrumb">
+        <ol id="breadcrumb-list" class="inline-flex items-center space-x-1"></ol>
+    </nav>
+</div>
 <div class="flex gap-6">
     <!-- Sidebar: Groups -->
     <div class="w-64 flex-shrink-0">
@@ -48,15 +53,82 @@ async function loadGroups() {
         return;
     }
     list.innerHTML = groups.map(g => `
-        <button onclick="selectGroup(${g.id})" class="block w-full text-left px-3 py-2 rounded hover:bg-blue-50 text-sm">
-            ${escapeHtml(g.name)} <span class="text-gray-400">(${g.document_count || 0})</span>
-        </button>
+        <div class="group-card block w-full text-left px-3 py-2 rounded hover:bg-blue-50 text-sm border-2 border-transparent transition-colors cursor-pointer"
+             data-group-id="${g.id}"
+             onclick="selectGroup(${g.id})"
+             ondragover="handleGroupDragOver(event)"
+             ondragleave="handleGroupDragLeave(event)"
+             ondrop="handleGroupDrop(event, ${g.id})">
+            <span class="pointer-events-none">${escapeHtml(g.name)} <span class="text-gray-400">(${g.document_count || 0})</span></span>
+        </div>
     `).join('');
+}
+
+function handleGroupDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('border-blue-400', 'bg-blue-50');
+}
+
+function handleGroupDragLeave(e) {
+    e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+}
+
+async function handleGroupDrop(e, groupId) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+    const files = e.dataTransfer.files;
+    if (!files.length) return;
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+    }
+    formData.append('group_id', groupId);
+
+    // Show upload indicator
+    const card = e.currentTarget;
+    const originalContent = card.innerHTML;
+    card.innerHTML = '<span class="text-blue-600 text-sm">Uploading...</span>';
+
+    const resp = await authFetch('/api/bulk/upload', { method: 'POST', body: formData });
+    card.innerHTML = originalContent;
+    if (resp.ok) {
+        loadDocuments();
+        loadGroups();
+    }
 }
 
 function selectGroup(groupId) {
     currentGroup = groupId;
     loadDocuments();
+    loadBreadcrumbs(groupId);
+}
+
+async function loadBreadcrumbs(groupId) {
+    if (!groupId) {
+        document.getElementById('breadcrumb-container').classList.add('hidden');
+        return;
+    }
+    try {
+        const resp = await authFetch('/api/groups/' + groupId + '/breadcrumbs');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const items = data.items || [];
+        if (items.length === 0) {
+            document.getElementById('breadcrumb-container').classList.add('hidden');
+            return;
+        }
+        const ol = document.getElementById('breadcrumb-list');
+        ol.innerHTML = '<li><a href="/dashboard" class="text-blue-600 hover:underline" onclick="selectGroup(null);loadDocuments();return false;">Home</a></li>' +
+            items.map((item, idx) => {
+                const isLast = idx === items.length - 1;
+                return `<li class="flex items-center"><span class="mx-1 text-gray-400">/</span>${isLast
+                    ? '<span class="text-gray-700">' + escapeHtml(item.name) + '</span>'
+                    : '<a href="#" class="text-blue-600 hover:underline" onclick="selectGroup(' + item.id + ');return false;">' + escapeHtml(item.name) + '</a>'
+                }</li>`;
+            }).join('');
+        document.getElementById('breadcrumb-container').classList.remove('hidden');
+    } catch (e) { /* ignore */ }
 }
 
 async function loadDocuments() {

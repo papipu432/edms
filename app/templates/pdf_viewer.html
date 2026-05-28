@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}PDF Viewer - EDMS{% endblock %}
+{% block content %}
+<div class="flex flex-col h-[calc(100vh-12rem)]">
+    <!-- Toolbar -->
+    <div class="bg-white rounded-lg shadow p-3 mb-4 flex items-center gap-4">
+        <button onclick="prevPage()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Prev</button>
+        <span class="text-sm">
+            Page <input id="page-input" type="number" min="1" value="1" class="w-14 border border-gray-300 rounded px-2 py-1 text-center text-sm" onchange="goToPage(this.value)">
+            of <span id="page-count">-</span>
+        </span>
+        <button onclick="nextPage()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Next</button>
+        <div class="border-l pl-4 ml-2 flex items-center gap-2">
+            <button onclick="zoomOut()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">-</button>
+            <span id="zoom-level" class="text-sm w-12 text-center">100%</span>
+            <button onclick="zoomIn()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">+</button>
+            <button onclick="zoomFit()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm">Fit</button>
+        </div>
+        <div class="border-l pl-4 ml-2">
+            <button onclick="printPdf()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Print</button>
+        </div>
+        <div class="ml-auto text-sm text-gray-500" id="doc-filename">Loading...</div>
+    </div>
+    <!-- PDF Canvas Container -->
+    <div id="pdf-container" class="flex-1 bg-gray-800 rounded-lg overflow-auto flex justify-center items-start p-4">
+        <canvas id="pdf-canvas" class="shadow-lg"></canvas>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const documentId = {{ document_id }};
+let pdfDoc = null;
+let currentPage = 1;
+let currentScale = 1.0;
+
+async function loadPdf() {
+    // Load document info
+    const infoResp = await authFetch('/api/documents/' + documentId);
+    if (infoResp.ok) {
+        const info = await infoResp.json();
+        document.getElementById('doc-filename').textContent = info.original_filename || '';
+    }
+
+    // Load PDF binary
+    const resp = await authFetch('/api/documents/' + documentId + '/preview');
+    if (!resp.ok) {
+        document.getElementById('pdf-container').innerHTML = '<p class="text-white">Failed to load PDF</p>';
+        return;
+    }
+    const arrayBuffer = await resp.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    pdfDoc = await loadingTask.promise;
+    document.getElementById('page-count').textContent = pdfDoc.numPages;
+    renderPage(currentPage);
+}
+
+async function renderPage(num) {
+    if (!pdfDoc) return;
+    const page = await pdfDoc.getPage(num);
+    const viewport = page.getViewport({ scale: currentScale });
+    const canvas = document.getElementById('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    document.getElementById('page-input').value = num;
+}
+
+function prevPage() {
+    if (currentPage <= 1) return;
+    currentPage--;
+    renderPage(currentPage);
+}
+
+function nextPage() {
+    if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+    currentPage++;
+    renderPage(currentPage);
+}
+
+function goToPage(val) {
+    const num = parseInt(val);
+    if (!pdfDoc || isNaN(num) || num < 1 || num > pdfDoc.numPages) return;
+    currentPage = num;
+    renderPage(currentPage);
+}
+
+function zoomIn() {
+    currentScale = Math.min(currentScale + 0.25, 4.0);
+    document.getElementById('zoom-level').textContent = Math.round(currentScale * 100) + '%';
+    renderPage(currentPage);
+}
+
+function zoomOut() {
+    currentScale = Math.max(currentScale - 0.25, 0.25);
+    document.getElementById('zoom-level').textContent = Math.round(currentScale * 100) + '%';
+    renderPage(currentPage);
+}
+
+function zoomFit() {
+    const container = document.getElementById('pdf-container');
+    currentScale = (container.clientWidth - 40) / 612; // approximate A4 width in points
+    document.getElementById('zoom-level').textContent = Math.round(currentScale * 100) + '%';
+    renderPage(currentPage);
+}
+
+function printPdf() {
+    const canvas = document.getElementById('pdf-canvas');
+    const dataUrl = canvas.toDataURL();
+    const win = window.open('');
+    win.document.write('<img src="' + dataUrl + '" onload="window.print();window.close()">');
+}
+
+loadPdf();
+</script>
+{% endblock %}

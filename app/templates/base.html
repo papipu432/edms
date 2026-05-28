@@ -14,7 +14,11 @@
                 <div class="flex items-center space-x-8">
                     <a href="/dashboard" class="text-xl font-bold text-blue-600">EDMS</a>
                     <a href="/dashboard" class="text-gray-600 hover:text-gray-900">Dashboard</a>
+                    <a href="/kanban" class="text-gray-600 hover:text-gray-900">Kanban</a>
                     <a href="/workflow" class="text-gray-600 hover:text-gray-900">Workflow</a>
+                    <a href="/activity" class="text-gray-600 hover:text-gray-900">Activity</a>
+                    <a href="/tags" class="text-gray-600 hover:text-gray-900">Tags</a>
+                    <a href="/templates" class="text-gray-600 hover:text-gray-900">Templates</a>
                     <a href="/admin/users" class="text-gray-600 hover:text-gray-900">Admin</a>
                     <a href="/settings/llm" class="text-gray-600 hover:text-gray-900">Settings</a>
                     <a href="/settings/backup" class="text-gray-600 hover:text-gray-900">Backup</a>
@@ -22,12 +26,44 @@
                     <a href="/settings/encryption" class="text-gray-600 hover:text-gray-900">Encryption</a>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <button onclick="openCommandPalette()" class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded px-2 py-1">
+                        <span class="hidden sm:inline">Search </span><kbd class="text-xs bg-gray-100 px-1 rounded">Ctrl+K</kbd>
+                    </button>
                     <span id="user-info" class="text-sm text-gray-600"></span>
                     <button onclick="logout()" class="text-sm text-red-600 hover:text-red-800">Logout</button>
                 </div>
             </div>
         </div>
     </nav>
+
+    <!-- Command Palette Modal -->
+    <div id="command-palette" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeCommandPalette()"></div>
+        <div class="absolute top-1/4 left-1/2 transform -translate-x-1/2 w-full max-w-lg bg-white rounded-lg shadow-2xl">
+            <div class="p-4">
+                <input id="command-palette-input" type="text" placeholder="Search documents, groups..." class="w-full border border-gray-300 rounded-md px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" autocomplete="off">
+            </div>
+            <div id="command-palette-results" class="max-h-80 overflow-y-auto border-t">
+                <p class="px-4 py-3 text-sm text-gray-500">Type to search...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Tour Container -->
+    <div id="onboarding-tour" class="hidden">
+        <div id="onboarding-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-40"></div>
+        <div id="onboarding-tooltip" class="fixed z-50 bg-white rounded-lg shadow-xl p-4 max-w-xs">
+            <p id="onboarding-text" class="text-sm text-gray-700 mb-3"></p>
+            <div class="flex justify-between items-center">
+                <span id="onboarding-step-indicator" class="text-xs text-gray-400"></span>
+                <div class="space-x-2">
+                    <button onclick="skipOnboarding()" class="text-xs text-gray-500 hover:text-gray-700">Skip</button>
+                    <button onclick="nextOnboardingStep()" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% block content %}{% endblock %}
     </main>
@@ -51,6 +87,140 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+
+        // Command Palette
+        let commandPaletteDebounce = null;
+
+        function openCommandPalette() {
+            document.getElementById('command-palette').classList.remove('hidden');
+            const input = document.getElementById('command-palette-input');
+            input.value = '';
+            input.focus();
+            document.getElementById('command-palette-results').innerHTML = '<p class="px-4 py-3 text-sm text-gray-500">Type to search...</p>';
+        }
+
+        function closeCommandPalette() {
+            document.getElementById('command-palette').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                const palette = document.getElementById('command-palette');
+                if (palette.classList.contains('hidden')) {
+                    openCommandPalette();
+                } else {
+                    closeCommandPalette();
+                }
+            }
+            if (e.key === 'Escape') {
+                closeCommandPalette();
+            }
+        });
+
+        document.getElementById('command-palette-input').addEventListener('input', function(e) {
+            clearTimeout(commandPaletteDebounce);
+            const query = e.target.value.trim();
+            if (!query) {
+                document.getElementById('command-palette-results').innerHTML = '<p class="px-4 py-3 text-sm text-gray-500">Type to search...</p>';
+                return;
+            }
+            commandPaletteDebounce = setTimeout(async () => {
+                const resp = await authFetch('/api/command-palette/search?q=' + encodeURIComponent(query));
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const results = data.results || [];
+                const container = document.getElementById('command-palette-results');
+                if (results.length === 0) {
+                    container.innerHTML = '<p class="px-4 py-3 text-sm text-gray-500">No results found</p>';
+                    return;
+                }
+                container.innerHTML = results.map(r => `
+                    <a href="${escapeHtml(r.url)}" class="block px-4 py-3 hover:bg-gray-50 border-b last:border-b-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs px-2 py-0.5 rounded ${r.type === 'document' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">${escapeHtml(r.type)}</span>
+                            <span class="text-sm font-medium">${escapeHtml(r.title)}</span>
+                        </div>
+                        ${r.description ? '<p class="text-xs text-gray-500 mt-1">' + escapeHtml(r.description) + '</p>' : ''}
+                    </a>
+                `).join('');
+            }, 300);
+        });
+
+        // Onboarding Tour
+        const onboardingSteps = [
+            { text: 'Welcome! Upload documents using this button.', target: '#upload-input, button[onclick*="upload"]', position: 'bottom' },
+            { text: 'Use the command palette (Ctrl+K) to quickly find documents and groups.', target: 'button[onclick="openCommandPalette()"]', position: 'bottom' },
+            { text: 'Track document lifecycle states on the Kanban board.', target: 'a[href="/kanban"]', position: 'bottom' },
+            { text: 'Browse the wiki for auto-generated documentation.', target: 'a[href="/workflow"]', position: 'bottom' },
+            { text: 'You are all set! Explore the system at your own pace.', target: null, position: 'center' }
+        ];
+        let currentOnboardingStep = 0;
+
+        async function checkOnboarding() {
+            if (!token) return;
+            try {
+                const resp = await authFetch('/api/onboarding/status');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!data.completed) {
+                    startOnboarding();
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function startOnboarding() {
+            currentOnboardingStep = 0;
+            document.getElementById('onboarding-tour').classList.remove('hidden');
+            showOnboardingStep();
+        }
+
+        function showOnboardingStep() {
+            const step = onboardingSteps[currentOnboardingStep];
+            document.getElementById('onboarding-text').textContent = step.text;
+            document.getElementById('onboarding-step-indicator').textContent = (currentOnboardingStep + 1) + ' / ' + onboardingSteps.length;
+
+            const tooltip = document.getElementById('onboarding-tooltip');
+            if (step.target) {
+                const el = document.querySelector(step.target);
+                if (el) {
+                    const rect = el.getBoundingClientRect();
+                    tooltip.style.top = (rect.bottom + 10) + 'px';
+                    tooltip.style.left = rect.left + 'px';
+                } else {
+                    tooltip.style.top = '50%';
+                    tooltip.style.left = '50%';
+                    tooltip.style.transform = 'translate(-50%, -50%)';
+                }
+            } else {
+                tooltip.style.top = '50%';
+                tooltip.style.left = '50%';
+                tooltip.style.transform = 'translate(-50%, -50%)';
+            }
+        }
+
+        function nextOnboardingStep() {
+            currentOnboardingStep++;
+            if (currentOnboardingStep >= onboardingSteps.length) {
+                completeOnboarding();
+            } else {
+                showOnboardingStep();
+            }
+        }
+
+        function skipOnboarding() {
+            completeOnboarding();
+        }
+
+        async function completeOnboarding() {
+            document.getElementById('onboarding-tour').classList.add('hidden');
+            try {
+                await authFetch('/api/onboarding/complete', { method: 'POST' });
+            } catch (e) { /* ignore */ }
+        }
+
+        // Check onboarding on page load
+        checkOnboarding();
     </script>
     {% block scripts %}{% endblock %}
 </body>
