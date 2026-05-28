@@ -213,12 +213,21 @@ class PipelineService:
                 if all_docs:
                     cited_ids = detect_citations(sanitized_content, all_docs)
                     for target_id in cited_ids:
-                        relationship = DocumentRelationship(
-                            source_document_id=doc_id,
-                            target_document_id=target_id,
-                            relationship_type=RelationshipType.cites,
+                        # Check if relationship already exists
+                        existing = await db.execute(
+                            select(DocumentRelationship).where(
+                                DocumentRelationship.source_document_id == doc_id,
+                                DocumentRelationship.target_document_id == target_id,
+                                DocumentRelationship.relationship_type == RelationshipType.cites,
+                            )
                         )
-                        db.add(relationship)
+                        if existing.scalar_one_or_none() is None:
+                            relationship = DocumentRelationship(
+                                source_document_id=doc_id,
+                                target_document_id=target_id,
+                                relationship_type=RelationshipType.cites,
+                            )
+                            db.add(relationship)
                     await db.flush()
             except Exception as cite_err:
                 logger.warning(
