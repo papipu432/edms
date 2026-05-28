@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "E-signature integration, delegation/proxy, SLA tracking, and workflow builder UI. This feature adds: (1) Digital signature system with SHA-256 hash, QR code generation, verification endpoint, and optional X.509 certificate signing. (2) Delegation model allowing users to delegate approval authority for a time period with scope. (3) SLA policy tracking per folder/template with on_time/at_risk/breached states and auto-escalation notifications. (4) Workflow builder HTML page for admins to visually configure approval chains using htmx.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Create app/models/signature.py with: DocumentSignature (id int PK, document_id FK to documents.id CASCADE, signer_id str FK to users.id, signature_hash str unique index, qr_code_path str nullable, signed_at datetime, certificate_data text nullable, verification_url str nullable, is_valid bool default True).",
     "Step 2 - Create app/models/delegation.py with: Delegation (id int PK, delegator_id str FK to users.id CASCADE, delegate_id str FK to users.id CASCADE, start_date datetime, end_date datetime, scope_type enum 'all'/'folder', scope_folder_id int FK nullable to groups.id, is_active bool default True, created_at datetime).",
@@ -38,5 +38,5 @@
     "uv run pytest tests/ -q --tb=short"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 18 new tests pass. Full suite passes at 740 tests (up from 722 baseline). QR code generation works with the qrcode library. The /api/signatures/verify/{hash} endpoint works without authentication. Workflow builder page renders at /workflow-builder."
 }
