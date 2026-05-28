@@ -1,0 +1,7 @@
+{
+  "task_id": "task-collaboration-workflow-batch2",
+  "task_description": "Implement batch 2 collaboration and workflow features: multi-stage approval chains, comments/discussion threads, @mentions, document checkout/lock, e-signature integration, delegation/proxy, SLA tracking, and workflow builder UI.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

@@ -1,7 +1,15 @@
 from app.models.annotation import Annotation
+from app.models.approval import (
+    ApprovalChain,
+    ApprovalDecision,
+    ApprovalRequest,
+    ApprovalStep,
+)
 from app.models.audit import DocumentAuditLog
+from app.models.comment import Comment
 from app.models.backup import BackupConfig, BackupJob, BackupSchedule
 from app.models.document import Document
+from app.models.document_lock import DocumentLock
 from app.models.encryption import EncryptionKey, KeyShare
 from app.models.group import Group
 from app.models.lifecycle import (
@@ -37,11 +45,17 @@ from app.models.workflow import WorkflowEntry
 
 __all__ = [
     "Annotation",
+    "ApprovalChain",
+    "ApprovalDecision",
+    "ApprovalRequest",
+    "ApprovalStep",
+    "Comment",
     "BackupConfig",
     "BackupJob",
     "BackupSchedule",
     "Document",
     "DocumentAuditLog",
+    "DocumentLock",
     "DocumentLifecycle",
     "DocumentLifecycleState",
     "DocumentTag",

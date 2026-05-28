@@ -36,7 +36,10 @@ from app.api.versions import router as versions_router
 from app.api.websocket import router as notifications_router
 from app.api.wiki import router as wiki_router
 from app.api.workflow import router as workflow_router
+from app.api.approval_chains import router as approval_chains_router
 from app.api.audit import router as audit_router
+from app.api.comments import router as comments_router
+from app.api.document_locks import router as document_locks_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -76,3 +79,6 @@ api_router.include_router(kanban_router)
 api_router.include_router(breadcrumbs_router)
 api_router.include_router(expiry_prediction_router)
 api_router.include_router(onboarding_router)
+api_router.include_router(approval_chains_router)
+api_router.include_router(comments_router)
+api_router.include_router(document_locks_router)
