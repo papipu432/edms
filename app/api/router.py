@@ -14,6 +14,7 @@ from app.api.daily_notes import router as daily_notes_router
 from app.api.documents import router as documents_router
 from app.api.expiry_prediction import router as expiry_prediction_router
 from app.api.groups import router as groups_router
+from app.api.health import router as health_router
 from app.api.health_dashboard import router as health_dashboard_router
 from app.api.kanban import router as kanban_router
 from app.api.compliance import router as compliance_router
@@ -61,6 +62,7 @@ from app.api.import_export import router as import_export_router
 from app.api.webhooks import router as webhooks_router
 
 api_router = APIRouter()
+api_router.include_router(health_router)
 api_router.include_router(auth_router)
 api_router.include_router(users_router)
 api_router.include_router(groups_router)

@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine
+from app.core.logging import setup_logging
 from app.core.security import hash_password
 from app.middleware.error_handler import RequestIDMiddleware, register_exception_handlers
 from app.middleware.geofence import GeoFenceMiddleware
+from app.middleware.metrics import PrometheusMiddleware
 from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.models.group import Base
 from app.models.user import (
@@ -259,6 +261,7 @@ async def _seed_data(session: AsyncSession) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    setup_logging()
     if settings.PDF_ENCRYPTION_PASSWORD == "changeme":
         logger.warning(
             "PDF_ENCRYPTION_PASSWORD is set to the default 'changeme'. "
@@ -296,6 +299,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(PrometheusMiddleware)
 
 app.add_middleware(
     RateLimiterMiddleware,
