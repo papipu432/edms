@@ -13,7 +13,10 @@ from app.api.expiry_prediction import router as expiry_prediction_router
 from app.api.groups import router as groups_router
 from app.api.health_dashboard import router as health_dashboard_router
 from app.api.kanban import router as kanban_router
+from app.api.compliance import router as compliance_router
+from app.api.geofence import router as geofence_router
 from app.api.knowledge_graph import router as knowledge_graph_router
+from app.api.watermark import router as watermark_router
 from app.api.ldap import router as ldap_router
 from app.api.lifecycle import router as lifecycle_router
 from app.api.obsidian import router as obsidian_router
@@ -90,3 +93,6 @@ api_router.include_router(signatures_router)
 api_router.include_router(delegations_router)
 api_router.include_router(sla_router)
 api_router.include_router(knowledge_graph_router)
+api_router.include_router(compliance_router)
+api_router.include_router(geofence_router)
+api_router.include_router(watermark_router)

@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     # Security monitoring webhook
     SECURITY_MONITORING_WEBHOOK_SECRET: str = ""
 
+    # Geo-fencing
+    GEO_FENCE_ENABLED: bool = False
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

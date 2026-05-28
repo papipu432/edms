@@ -8,9 +8,11 @@ from app.models.approval import (
 from app.models.audit import DocumentAuditLog
 from app.models.comment import Comment
 from app.models.backup import BackupConfig, BackupJob, BackupSchedule
+from app.models.compliance import ComplianceReport
 from app.models.document import Document
 from app.models.document_lock import DocumentLock
 from app.models.encryption import EncryptionKey, KeyShare
+from app.models.geofence import GeoFenceRule
 from app.models.group import Group
 from app.models.lifecycle import (
     DocumentLifecycle,
@@ -41,6 +43,7 @@ from app.models.user import (
     UserRole,
 )
 from app.models.version import DocumentVersion
+from app.models.watermark import WatermarkConfig
 from app.models.workflow import WorkflowEntry
 
 __all__ = [
@@ -53,6 +56,7 @@ __all__ = [
     "BackupConfig",
     "BackupJob",
     "BackupSchedule",
+    "ComplianceReport",
     "Document",
     "DocumentAuditLog",
     "DocumentLock",
@@ -63,6 +67,7 @@ __all__ = [
     "DocumentVersion",
     "EncryptionKey",
     "FolderAssignment",
+    "GeoFenceRule",
     "Group",
     "KeyShare",
     "LifecycleTransition",
@@ -86,5 +91,6 @@ __all__ = [
     "RolePermission",
     "User",
     "UserRole",
+    "WatermarkConfig",
     "WorkflowEntry",
 ]

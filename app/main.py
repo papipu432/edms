@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import engine
 from app.core.security import hash_password
 from app.middleware.error_handler import RequestIDMiddleware, register_exception_handlers
+from app.middleware.geofence import GeoFenceMiddleware
 from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.models.group import Base
 from app.models.user import (
@@ -303,6 +304,10 @@ app.add_middleware(
 )
 
 app.add_middleware(RequestIDMiddleware)
+
+# Geo-fencing middleware (only active if enabled)
+if settings.GEO_FENCE_ENABLED:
+    app.add_middleware(GeoFenceMiddleware)
 
 # Mount setup wizard routes (active only when first-launch detected)
 app.include_router(setup_wizard_router)
