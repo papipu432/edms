@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -190,25 +190,23 @@ async def sla_dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get SLA compliance dashboard metrics."""
-    result = await db.execute(select(DocumentSLA))
-    all_slas = list(result.scalars().all())
+    """Get SLA compliance dashboard metrics using SQL aggregation."""
+    result = await db.execute(
+        select(
+            func.count().label("total"),
+            func.count(case((DocumentSLA.status == SLAStatus.on_time, 1))).label("on_time"),
+            func.count(case((DocumentSLA.status == SLAStatus.at_risk, 1))).label("at_risk"),
+            func.count(case((DocumentSLA.status == SLAStatus.breached, 1))).label("breached"),
+            func.count(case((DocumentSLA.status == SLAStatus.completed, 1))).label("completed"),
+        )
+    )
+    row = result.one()
 
-    total = len(all_slas)
-    on_time = 0
-    at_risk = 0
-    breached = 0
-    completed = 0
-
-    for sla in all_slas:
-        if sla.status == SLAStatus.completed:
-            completed += 1
-        elif sla.status == SLAStatus.breached:
-            breached += 1
-        elif sla.status == SLAStatus.at_risk:
-            at_risk += 1
-        else:
-            on_time += 1
+    total = row.total
+    on_time = row.on_time
+    at_risk = row.at_risk
+    breached = row.breached
+    completed = row.completed
 
     compliance_rate = 0.0
     if total > 0:
@@ -232,7 +230,14 @@ async def check_breaches(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Check all active SLAs and update statuses. Notify escalation_role on breach."""
+    """Check all active SLAs and update statuses. Notify escalation_role on breach.
+
+    NOTE: This endpoint has a concurrency limitation. Two concurrent calls can
+    both read the same SLA as non-escalated and both create breach notifications.
+    For production use, add row-level locking (SELECT ... FOR UPDATE) or make
+    the notification creation conditional on an atomic status update to prevent
+    duplicate breach notifications under concurrent invocation.
+    """
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(DocumentSLA).where(

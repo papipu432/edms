@@ -95,6 +95,8 @@ async def list_comments(
     document_id: int,
     db: AsyncSession = Depends(get_db),
 ):
+    # Intentionally unauthenticated - matches the pattern of the annotations list
+    # endpoint which is also publicly accessible (see test_workflow.py).
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")

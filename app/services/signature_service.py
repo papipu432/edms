@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import qrcode
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
+logger = logging.getLogger(__name__)
 
 STORAGE_DIR = Path("storage/qrcodes")
 
@@ -24,11 +26,16 @@ def generate_qr_code(verification_url: str, output_path: str) -> str:
     return output_path
 
 
-def sign_with_certificate(content_bytes: bytes, cert_pem: str) -> str | None:
-    """Sign content with a PEM-encoded private key. Returns hex-encoded signature."""
+def sign_with_certificate(content_bytes: bytes, private_key_pem: str) -> str | None:
+    """Sign content with a PEM-encoded private key. Returns hex-encoded signature.
+
+    Used in server-side signing ceremony: the private key signs the content to
+    produce a verifiable cryptographic signature. The key material is used only
+    within this operation and is not stored or forwarded.
+    """
     try:
         private_key = serialization.load_pem_private_key(
-            cert_pem.encode("utf-8"), password=None
+            private_key_pem.encode("utf-8"), password=None
         )
         signature = private_key.sign(  # type: ignore[union-attr]
             content_bytes,
@@ -36,5 +43,6 @@ def sign_with_certificate(content_bytes: bytes, cert_pem: str) -> str | None:
             hashes.SHA256(),
         )
         return signature.hex()
-    except Exception:
+    except Exception as exc:
+        logger.error("Failed to sign content with provided private key: %s", exc)
         return None

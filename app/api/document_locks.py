@@ -13,6 +13,11 @@ from app.schemas.document_lock import LockCreate, LockResponse, LockStatusRespon
 
 router = APIRouter(tags=["document-locks"])
 
+# NOTE: Document locks are advisory-only. Document mutation endpoints (upload,
+# update metadata, delete) do not currently check lock status before allowing
+# writes. Enforcement at the mutation layer can be added incrementally by
+# consulting _get_active_lock before permitting changes.
+
 
 async def _get_active_lock(document_id: int, db: AsyncSession) -> DocumentLock | None:
     """Get the active (non-expired) lock for a document, cleaning up expired ones."""

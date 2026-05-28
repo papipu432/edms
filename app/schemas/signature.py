@@ -4,7 +4,15 @@ from pydantic import BaseModel
 
 
 class SignDocumentRequest(BaseModel):
-    certificate_pem: str | None = None
+    """Request to sign a document.
+
+    The optional private_key_pem field is used for server-side signing ceremony:
+    the key signs the document content to produce a cryptographic signature that
+    is stored alongside the hash-based signature. The private key is used only
+    within the signing operation and is not persisted or transmitted further.
+    """
+
+    private_key_pem: str | None = None
 
 
 class SignatureResponse(BaseModel):
