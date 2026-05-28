@@ -6,9 +6,11 @@ from app.api.annotations import router as annotations_router
 from app.api.auth import router as auth_router
 from app.api.breadcrumbs import router as breadcrumbs_router
 from app.api.bulk import router as bulk_router
+from app.api.canvas import router as canvas_router
 from app.api.chat import router as chat_router
 from app.api.command_palette import router as command_palette_router
 from app.api.compare import router as compare_router
+from app.api.daily_notes import router as daily_notes_router
 from app.api.documents import router as documents_router
 from app.api.expiry_prediction import router as expiry_prediction_router
 from app.api.groups import router as groups_router
@@ -22,6 +24,7 @@ from app.api.watermark import router as watermark_router
 from app.api.ldap import router as ldap_router
 from app.api.lifecycle import router as lifecycle_router
 from app.api.obsidian import router as obsidian_router
+from app.api.obsidian_sync import router as obsidian_sync_router
 from app.api.onboarding import router as onboarding_router
 from app.api.org import router as org_router
 from app.api.pages import router as pages_router
@@ -41,6 +44,7 @@ from app.api.users import router as users_router
 from app.api.versions import router as versions_router
 from app.api.websocket import router as notifications_router
 from app.api.wiki import router as wiki_router
+from app.api.wiki_graph import router as wiki_graph_router
 from app.api.workflow import router as workflow_router
 from app.api.approval_chains import router as approval_chains_router
 from app.api.audit import router as audit_router
@@ -100,3 +104,7 @@ api_router.include_router(geofence_router)
 api_router.include_router(watermark_router)
 api_router.include_router(access_request_router)
 api_router.include_router(sessions_router)
+api_router.include_router(obsidian_sync_router)
+api_router.include_router(daily_notes_router)
+api_router.include_router(wiki_graph_router)
+api_router.include_router(canvas_router)

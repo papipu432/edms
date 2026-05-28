@@ -1,0 +1,45 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Bi-directional Obsidian sync import, Obsidian plugin specification, wiki graph view page, daily notes, and canvas/whiteboard - the Obsidian & Knowledge Integration features.",
+  "status": "in_progress",
+  "steps": [
+    "1. OBSIDIAN SYNC IMPORT: Create app/services/obsidian_sync.py with ObsidianSyncService class. Accept a zip of markdown files, extract them, compare with existing wiki pages by computing file hashes (MD5/SHA256). Detect: new pages (in zip but not wiki), modified pages (hash differs), deleted pages (in wiki but not in zip). Conflict resolution: Obsidian wins for user-created pages (entities/, topics/), EDMS wins for auto-generated summaries (summaries/). Track sync state with a manifest JSON file at wiki_path/sync_manifest.json containing last_sync_timestamp and file_hashes dict.",
+    "2. Create app/api/obsidian_sync.py with router prefix /api/wiki/sync. POST /api/wiki/sync/import endpoint that accepts a zip file upload (UploadFile), calls ObsidianSyncService to process the import, returns a sync result (pages_created, pages_updated, pages_deleted, conflicts list). Requires authentication via get_current_user.",
+    "3. Create app/schemas/obsidian_sync.py with Pydantic models: SyncResult (pages_created: int, pages_updated: int, pages_deleted: int, conflicts: list[SyncConflict]), SyncConflict (path: str, resolution: str, detail: str), SyncManifest (last_sync: str, file_hashes: dict[str, str]).",
+    "4. Register the obsidian_sync router in app/api/router.py.",
+    "5. OBSIDIAN PLUGIN SPEC: Create docs/obsidian-plugin/ directory with: manifest.json (Obsidian plugin format with id, name, version, minAppVersion, description, author, authorUrl, isDesktopOnly), README.md describing plugin capabilities (connect to EDMS API, sync vault on command, search EDMS from Obsidian, show document metadata in sidebar), and main.ts TypeScript source outline showing plugin structure (extends Plugin, onload/onunload, settings tab, commands for sync and search, sidebar view class).",
+    "6. WIKI GRAPH VIEW: Create app/templates/wiki_graph.html - an interactive graph page that shows ALL wiki pages as nodes with links between them as edges. Color-coded by type (entity=blue, topic=green, summary=orange). Uses vis.js (already used in knowledge_graph.py). Supports zoom, pan, click-to-navigate to wiki page. Add GET /pages/wiki/graph route in app/api/pages.py.",
+    "7. Create app/api/wiki_graph.py with GET /api/wiki/graph/data endpoint that reads all wiki pages, extracts markdown links between them, and returns nodes/edges JSON for the graph. Each node has id, label, type (entity/topic/summary), color. Each edge has source, target.",
+    "8. DAILY NOTES: Add daily notes generation to app/services/wiki.py (or separate app/services/daily_notes.py). Method generate_daily_note(db) that: queries documents uploaded today, pending approvals, expiring documents, lifecycle alerts, recent activity. Uses LLM (chat_completion) to generate natural language summary. Stores result in wiki as daily/YYYY-MM-DD.md.",
+    "9. Create app/api/daily_notes.py with: POST /api/wiki/daily-note (generate for today, requires auth), GET /api/wiki/daily-notes (list all daily notes, returns list of date strings and paths). Register in router.py.",
+    "10. CANVAS/WHITEBOARD: Create app/models/canvas.py with Canvas (id int PK, name str, owner_id str FK to users.id, created_at), CanvasItem (id int PK, canvas_id int FK, document_id int nullable FK, note_text str nullable, x_position float, y_position float, width float, height float, color str nullable), CanvasConnection (id int PK, canvas_id int FK, from_item_id int FK, to_item_id int FK, label str nullable).",
+    "11. Create app/schemas/canvas.py with Pydantic models for Canvas CRUD, CanvasItem CRUD, CanvasConnection CRUD, and CanvasExport (Obsidian .canvas JSON format with nodes array and edges array).",
+    "12. Create app/api/canvas.py with full CRUD: POST/GET/PUT/DELETE for canvases, items, connections. GET /api/canvas/{id}/export for Obsidian .canvas format export. Register in router.py.",
+    "13. Create app/templates/canvas.html - HTML page with drag-and-drop canvas using HTML5 drag events or simple mousedown/mousemove. Shows document cards that can be positioned. Save positions via API calls. Add GET /pages/canvas route in app/api/pages.py.",
+    "14. Write tests in tests/test_obsidian_sync.py covering: import new pages, import modified pages, conflict resolution (summaries not overwritten), sync manifest tracking.",
+    "15. Write tests in tests/test_daily_notes.py covering: daily note generation endpoint, list endpoint.",
+    "16. Write tests in tests/test_canvas.py covering: canvas CRUD, item CRUD, connection CRUD, export as .canvas format.",
+    "17. Write tests in tests/test_wiki_graph.py covering: graph data endpoint returns nodes/edges, graph page renders."
+  ],
+  "acceptance_criteria": [
+    "POST /api/wiki/sync/import accepts a zip file and returns sync results with pages_created/updated/deleted counts",
+    "Sync manifest at wiki_path/sync_manifest.json tracks file hashes and last sync timestamp",
+    "Conflict resolution: user pages (entities/topics) use Obsidian version, summaries keep EDMS version",
+    "docs/obsidian-plugin/ contains manifest.json, README.md, and main.ts scaffold",
+    "GET /pages/wiki/graph renders an interactive vis.js graph of all wiki pages",
+    "GET /api/wiki/graph/data returns JSON with nodes (color-coded by type) and edges (from wiki links)",
+    "POST /api/wiki/daily-note generates a daily digest wiki page at daily/YYYY-MM-DD.md",
+    "GET /api/wiki/daily-notes returns list of existing daily notes",
+    "Canvas model supports CRUD for canvases, items, and connections",
+    "GET /api/canvas/{id}/export returns Obsidian .canvas format JSON",
+    "GET /pages/canvas renders a drag-and-drop canvas page",
+    "All new tests pass with uv run pytest tests/ -x -q"
+  ],
+  "verification": [
+    "uv run pytest tests/test_obsidian_sync.py tests/test_daily_notes.py tests/test_canvas.py tests/test_wiki_graph.py -x -q",
+    "uv run pytest tests/ -x -q (full test suite passes)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

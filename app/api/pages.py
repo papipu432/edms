@@ -81,3 +81,13 @@ async def admin_users_page(request: Request):
 @router.get("/workflow-builder")
 async def workflow_builder_page(request: Request):
     return templates.TemplateResponse(request, "workflow_builder.html")
+
+
+@router.get("/pages/wiki/graph")
+async def wiki_graph_page(request: Request):
+    return templates.TemplateResponse(request, "wiki_graph.html")
+
+
+@router.get("/pages/canvas")
+async def canvas_page(request: Request):
+    return templates.TemplateResponse(request, "canvas.html")

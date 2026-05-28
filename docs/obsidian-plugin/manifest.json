@@ -1,0 +1,10 @@
+{
+  "id": "edms-obsidian-plugin",
+  "name": "EDMS Sync",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Synchronize your Obsidian vault with an EDMS instance. Search documents, sync pages, and view metadata from within Obsidian.",
+  "author": "EDMS Team",
+  "authorUrl": "https://github.com/edms",
+  "isDesktopOnly": false
+}
