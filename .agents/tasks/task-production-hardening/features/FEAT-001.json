@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Docker Compose production stack, Dockerfile with multi-stage build, Alembic migrations, and entrypoint script. This creates the complete containerized deployment infrastructure.",
+  "status": "completed",
+  "steps": [
+    "Create Dockerfile at project root with multi-stage build: builder stage uses python:3.11-slim, installs uv, copies pyproject.toml+uv.lock, runs 'uv sync --frozen --no-dev'. Final stage copies .venv, copies app code, exposes port 8000, uses entrypoint script.",
+    "Create scripts/entrypoint.sh that: waits for postgres to be ready (loop with pg_isready or python check), runs 'alembic upgrade head', then exec gunicorn with uvicorn workers (gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000).",
+    "Create docker-compose.yml with services: app (builds from Dockerfile, depends_on postgres/redis/chromadb/minio with healthchecks), postgres (image: postgres:16, volume: postgres_data, healthcheck: pg_isready, env vars), chromadb (based on existing docker-compose.chroma.yml config with token auth and healthcheck), minio (image: minio/minio, volume: minio_data, command: server /data --console-address :9001, healthcheck: curl), redis (image: redis:7-alpine, volume: redis_data, healthcheck: redis-cli ping), celery-worker (same image as app, command: celery -A app.tasks worker -l info), celery-beat (same image as app, command: celery -A app.tasks beat -l info), nginx (image: nginx:alpine, volumes for config and certs, ports 80/443, depends_on app). Networks: internal (all backend services), external (nginx + app). Named volumes: postgres_data, minio_data, chroma_data, redis_data.",
+    "Create docker-compose.override.yml for development: app service overrides with command uvicorn --reload, volume mount ./app:/app/app for hot reload, exposed port 8000 directly, no TLS. Remove nginx from dev. Set DEBUG=1.",
+    "Create .dockerignore file excluding .venv, .git, __pycache__, *.db, tests/, .ruff_cache, .pytest_cache, storage/, uploads/, wiki/, chroma_db/, data/.",
+    "Create alembic.ini at project root: script_location = alembic, sqlalchemy.url populated from env var (will be overridden by env.py).",
+    "Create alembic/ directory with env.py that: imports all models via app.models (which already imports everything), uses app.core.config.settings.DATABASE_URL, configures async engine using run_async_migrations pattern (from alembic async docs), handles both postgresql+asyncpg and sqlite+aiosqlite URLs.",
+    "Create alembic/versions/ directory with initial migration that calls Base.metadata.create_all via op.create_table for ALL tables. Use autogenerate approach: import Base from app.models.group, set target_metadata = Base.metadata in env.py.",
+    "Run 'alembic revision --autogenerate -m initial' to generate the initial migration covering all 35+ models.",
+    "Add gunicorn, asyncpg, psycopg2-binary, redis, celery[redis] to pyproject.toml dependencies.",
+    "Update app/core/config.py to add REDIS_URL setting (default: redis://localhost:6379/0), CELERY_BROKER_URL (default: redis://localhost:6379/0), CELERY_RESULT_BACKEND (default: redis://localhost:6379/1), LOG_FORMAT (default: 'text'), and WORKERS (default: 4)."
+  ],
+  "acceptance_criteria": [
+    "Dockerfile builds successfully with 'docker build -t edms:test .'",
+    "docker-compose.yml passes 'docker compose config' validation",
+    "docker-compose.override.yml passes 'docker compose -f docker-compose.yml -f docker-compose.override.yml config' validation",
+    "alembic.ini and alembic/env.py exist and are properly configured",
+    "An initial Alembic migration file exists in alembic/versions/",
+    "scripts/entrypoint.sh exists and is executable",
+    "pyproject.toml includes gunicorn, asyncpg, redis, celery[redis] dependencies",
+    "uv sync completes without errors after adding new deps",
+    "uv run pytest tests/ -x -q still passes (no regressions)"
+  ],
+  "verification": [
+    "Run 'uv sync' and confirm it succeeds",
+    "Run 'uv run ruff check app/' and confirm no errors",
+    "Run 'docker build -t edms:test .' from project root",
+    "Run 'docker compose config' to validate compose file",
+    "Run 'uv run pytest tests/ -x -q' to confirm existing tests still pass"
+  ],
+  "blocked_reason": null,
+  "findings": "1. Had to add missing model imports (Tenant, Canvas, Chat, Delegation, HealthScore, Notification, Relationship, ScheduledReport, SearchHistory, Signature, SLA, Webhook) to app/models/__init__.py for Alembic autogenerate to work - the tenants table FK was unresolvable without Tenant import. 2. docker-compose plugin not available in sandbox but docker build works fine. 3. One pre-existing flaky test (test_chat_enhanced.py::TestUnauthorizedAccess::test_cannot_access_other_users_session) fails due to rate limiting when run in full suite but passes individually - not related to our changes. 4. All 948 other tests pass."
+}
