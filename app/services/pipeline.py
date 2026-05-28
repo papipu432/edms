@@ -7,8 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.llm import extract_keywords, generate_embeddings, generate_summary
 from app.models.document import Document, DocumentStatus
+from app.models.relationship import DocumentRelationship, RelationshipType
+from app.models.tag import DocumentTag, Tag
+from app.services.auto_tagger import generate_tags
 from app.services.chunker import split_text
+from app.services.citation_detector import detect_citations
 from app.services.converter import ConversionService
+from app.services.form_extractor import extract_fields
 from app.services.prompt_guard import PromptGuard
 from app.services.storage import StorageService
 from app.services.vectordb import VectorDBService
@@ -147,6 +152,66 @@ class PipelineService:
             except Exception as wiki_err:
                 logger.warning(
                     "Wiki ingest failed for document %d: %s", doc_id, wiki_err
+                )
+
+            # Auto-tagging (non-critical - failures don't break pipeline)
+            try:
+                tag_names = generate_tags(sanitized_content)
+                for tag_name in tag_names:
+                    # Check if tag exists, create if not
+                    result_tag = await db.execute(
+                        select(Tag).where(Tag.name == tag_name)
+                    )
+                    tag = result_tag.scalar_one_or_none()
+                    if not tag:
+                        tag = Tag(name=tag_name)
+                        db.add(tag)
+                        await db.flush()
+                    # Create DocumentTag association
+                    doc_tag = DocumentTag(document_id=doc_id, tag_id=tag.id)
+                    db.add(doc_tag)
+                await db.flush()
+            except Exception as tag_err:
+                logger.warning(
+                    "Auto-tagging failed for document %d: %s", doc_id, tag_err
+                )
+
+            # Form field extraction (non-critical - failures don't break pipeline)
+            try:
+                extracted = extract_fields(sanitized_content)
+                if extracted:
+                    document.extracted_fields = extracted
+                    await db.flush()
+            except Exception as extract_err:
+                logger.warning(
+                    "Form extraction failed for document %d: %s",
+                    doc_id,
+                    extract_err,
+                )
+
+            # Citation detection (non-critical - failures don't break pipeline)
+            try:
+                all_docs_result = await db.execute(
+                    select(Document.id, Document.original_filename).where(
+                        Document.id != doc_id
+                    )
+                )
+                all_docs = [(row[0], row[1]) for row in all_docs_result.fetchall()]
+                if all_docs:
+                    cited_ids = detect_citations(sanitized_content, all_docs)
+                    for target_id in cited_ids:
+                        relationship = DocumentRelationship(
+                            source_document_id=doc_id,
+                            target_document_id=target_id,
+                            relationship_type=RelationshipType.cites,
+                        )
+                        db.add(relationship)
+                    await db.flush()
+            except Exception as cite_err:
+                logger.warning(
+                    "Citation detection failed for document %d: %s",
+                    doc_id,
+                    cite_err,
                 )
 
             # Generate preview (non-critical - failures don't break pipeline)

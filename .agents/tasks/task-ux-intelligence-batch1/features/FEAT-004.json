@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Document Intelligence pipeline integration: LLM auto-tagging on upload, form field extraction, and citation graph auto-detection. Extend the existing pipeline in app/services/pipeline.py.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "1. Create app/services/auto_tagger.py: Service that takes document markdown content and uses LLM (via app/core/llm.py chat_completion) to generate 3-5 relevant tags. Returns list of tag name strings. Use a system prompt like 'Extract 3-5 concise topic tags from this document. Return only tag names, one per line.'",
     "2. Create app/services/form_extractor.py: Service that takes markdown content and an optional extraction_prompt (from template). Uses LLM to extract key-value pairs (e.g., invoice number, date, amount, parties). Returns dict. Default prompt: 'Extract all key-value pairs, form fields, and structured data from this document as JSON.' If template has extraction_prompt, use that instead.",
