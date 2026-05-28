@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+MAX_RETRIES=30
+RETRY_COUNT=0
 echo "Waiting for PostgreSQL to be ready..."
 until python -c "
 import asyncio, asyncpg, os
@@ -14,7 +16,12 @@ async def check():
     await conn.close()
 asyncio.run(check())
 " 2>/dev/null; do
-    echo "PostgreSQL is not ready yet, retrying in 2s..."
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "ERROR: PostgreSQL not available after $MAX_RETRIES attempts. Exiting."
+        exit 1
+    fi
+    echo "PostgreSQL is not ready yet, retrying in 2s... (attempt $RETRY_COUNT/$MAX_RETRIES)"
     sleep 2
 done
 echo "PostgreSQL is ready."
