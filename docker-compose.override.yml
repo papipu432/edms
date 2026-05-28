@@ -1,0 +1,13 @@
+services:
+  app:
+    command: uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./app:/app/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+
+  nginx:
+    profiles:
+      - production

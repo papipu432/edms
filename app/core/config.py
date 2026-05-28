@@ -91,6 +91,15 @@ class Settings(BaseSettings):
     # Geo-fencing
     GEO_FENCE_ENABLED: bool = False
 
+    # Redis / Celery
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+
+    # Production
+    LOG_FORMAT: str = "text"
+    WORKERS: int = 4
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

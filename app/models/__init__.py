@@ -9,23 +9,34 @@ from app.models.approval import (
 from app.models.audit import DocumentAuditLog
 from app.models.comment import Comment
 from app.models.backup import BackupConfig, BackupJob, BackupSchedule
+from app.models.canvas import Canvas, CanvasConnection, CanvasItem
+from app.models.chat import ChatSession, ChatMessage
 from app.models.compliance import ComplianceReport
+from app.models.delegation import Delegation
 from app.models.document import Document
 from app.models.document_lock import DocumentLock
 from app.models.encryption import EncryptionKey, KeyShare
 from app.models.geofence import GeoFenceRule
 from app.models.group import Group
+from app.models.health_score import HealthScoreRecord
 from app.models.lifecycle import (
     DocumentLifecycle,
     DocumentLifecycleState,
     LifecycleTransition,
     LifecycleType,
 )
+from app.models.notification import Notification
+from app.models.relationship import DocumentRelationship
+from app.models.scheduled_report import ScheduledReport
+from app.models.search_history import SearchHistory
 from app.models.security import MonitoringConfig, SecurityAlert
 from app.models.session import SessionDocument, UserSession
+from app.models.signature import DocumentSignature
+from app.models.sla import DocumentSLA, SLAPolicy
 from app.models.smart_folder import SmartFolder
 from app.models.tag import DocumentTag, Tag
 from app.models.template import DocumentTemplate
+from app.models.tenant import Tenant
 from app.models.user import (
     FolderAssignment,
     LdapConfig,
@@ -46,6 +57,7 @@ from app.models.user import (
 )
 from app.models.version import DocumentVersion
 from app.models.watermark import WatermarkConfig
+from app.models.webhook import WebhookConfig
 from app.models.workflow import WorkflowEntry
 
 __all__ = [
@@ -55,16 +67,25 @@ __all__ = [
     "ApprovalDecision",
     "ApprovalRequest",
     "ApprovalStep",
+    "Canvas",
+    "CanvasConnection",
+    "CanvasItem",
+    "ChatMessage",
+    "ChatSession",
     "Comment",
     "BackupConfig",
     "BackupJob",
     "BackupSchedule",
     "ComplianceReport",
+    "Delegation",
     "Document",
     "DocumentAuditLog",
     "DocumentLock",
     "DocumentLifecycle",
     "DocumentLifecycleState",
+    "DocumentRelationship",
+    "DocumentSLA",
+    "DocumentSignature",
     "DocumentTag",
     "DocumentTemplate",
     "DocumentVersion",
@@ -72,14 +93,20 @@ __all__ = [
     "FolderAssignment",
     "GeoFenceRule",
     "Group",
+    "HealthScoreRecord",
     "KeyShare",
     "LifecycleTransition",
     "LifecycleType",
     "MonitoringConfig",
+    "Notification",
+    "ScheduledReport",
+    "SearchHistory",
     "SecurityAlert",
     "SessionDocument",
+    "SLAPolicy",
     "SmartFolder",
     "Tag",
+    "Tenant",
     "LdapConfig",
     "LdapGroupRole",
     "LdapSyncLog",
@@ -97,5 +124,6 @@ __all__ = [
     "UserRole",
     "UserSession",
     "WatermarkConfig",
+    "WebhookConfig",
     "WorkflowEntry",
 ]
