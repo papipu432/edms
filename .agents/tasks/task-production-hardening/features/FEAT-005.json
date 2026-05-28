@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "fix",
   "description": "Address review findings: cache Redis ping in is_celery_available(), add max retries to entrypoint.sh, wrap sync Redis in asyncio.to_thread in health probe, restrict /metrics nginx endpoint to internal IPs.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Fix app/tasks/utils.py: Add TTL-based cache (10s) to is_celery_available() to avoid per-request Redis connections.",
     "Fix scripts/entrypoint.sh: Add MAX_RETRIES=30 counter with exit 1 on exhaustion.",
@@ -16,5 +16,5 @@
     "/metrics nginx location restricts access to RFC1918 and localhost IPs"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All 937 tests pass (excluding pre-existing flaky test_chat_enhanced.py). Ruff check passes on both modified files. All 4 review issues addressed."
 }
