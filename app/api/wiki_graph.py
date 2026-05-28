@@ -1,5 +1,6 @@
 """API endpoints for wiki graph visualization data."""
 
+import asyncio
 import re
 from pathlib import Path
 
@@ -42,6 +43,11 @@ async def get_wiki_graph_data(
     Reads all wiki pages, extracts markdown links, and returns
     nodes (color-coded by type) and edges.
     """
+    return await asyncio.to_thread(_build_graph_data)
+
+
+def _build_graph_data() -> dict:
+    """Build graph data synchronously (run in thread to avoid blocking event loop)."""
     wiki_path = Path(settings.WIKI_PATH)
 
     nodes = []

@@ -83,6 +83,11 @@ class ObsidianSyncService:
 
         # Process files in zip
         for path, content in zip_files.items():
+            # Validate path stays within wiki directory (zip-slip protection)
+            resolved = (self.wiki_path / path).resolve()
+            if not resolved.is_relative_to(self.wiki_path.resolve()):
+                continue
+
             file_hash = self._compute_hash(content)
             new_hashes[path] = file_hash
 

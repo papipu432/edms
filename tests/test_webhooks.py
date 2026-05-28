@@ -188,7 +188,7 @@ async def test_hmac_signature_correct():
     signature = service.sign_payload(secret, payload)
 
     # Verify independently
-    expected = hmac.new(
+    expected = hmac.HMAC(
         secret.encode("utf-8"),
         payload.encode("utf-8"),
         hashlib.sha256,

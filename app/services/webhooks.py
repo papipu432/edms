@@ -27,7 +27,7 @@ class WebhookService:
 
     def sign_payload(self, secret: str, payload: str) -> str:
         """Sign a payload with HMAC-SHA256."""
-        return hmac.new(
+        return hmac.HMAC(
             secret.encode("utf-8"),
             payload.encode("utf-8"),
             hashlib.sha256,

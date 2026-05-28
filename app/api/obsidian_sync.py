@@ -1,6 +1,6 @@
 """API endpoints for Obsidian sync import."""
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.core.security import get_current_user
@@ -11,6 +11,9 @@ from app.services.obsidian_sync import ObsidianSyncService
 router = APIRouter(prefix="/api/wiki/sync", tags=["obsidian-sync"])
 
 sync_service = ObsidianSyncService(wiki_path=settings.WIKI_PATH)
+
+# Maximum upload size: 50MB
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 
 
 @router.post("/import", response_model=SyncResult)
@@ -25,5 +28,10 @@ async def import_obsidian_vault(
     - EDMS wins for auto-generated summaries (summaries/)
     """
     zip_data = await file.read()
+    if len(zip_data) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Upload too large. Maximum size is {MAX_UPLOAD_SIZE // (1024 * 1024)}MB.",
+        )
     result = sync_service.import_zip(zip_data)
     return result

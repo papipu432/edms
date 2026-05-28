@@ -5,6 +5,7 @@ import io
 import json
 import zipfile
 from io import BytesIO
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,11 @@ class ImportExportService:
                             folder_path = entry.get("folder_path", "Default")
                             tags = entry.get("tags", [])
 
+                            # Zip-slip protection: reject path traversal in filenames
+                            if ".." in filename or filename.startswith("/"):
+                                errors.append(f"Rejected unsafe filename: {filename}")
+                                continue
+
                             # Create or find group
                             group = await self._get_or_create_group(db, folder_path)
                             if group:
@@ -62,6 +68,12 @@ class ImportExportService:
                     for name in zf.namelist():
                         if name.endswith("/"):
                             continue
+
+                        # Zip-slip protection: validate path stays within intended directory
+                        resolved = Path(f"/imported/{name}").resolve()
+                        if ".." in name.split("/"):
+                            continue
+
                         parts = name.split("/")
                         folder_name = parts[0] if len(parts) > 1 else "Default"
                         filename = parts[-1]

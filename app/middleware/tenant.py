@@ -16,8 +16,10 @@ class TenantMiddleware(BaseHTTPMiddleware):
     If no tenant is found, defaults to None (single-tenant mode)
     for backward compatibility.
 
-    NOTE: This middleware is defined for optional use. It is NOT added to
-    the app middleware stack by default to avoid breaking existing tests.
+    NOTE: This middleware is intentionally NOT auto-registered in app/main.py.
+    It is opt-in to maintain backward compatibility with existing single-tenant
+    deployments. Applications that require multi-tenancy should explicitly add
+    this middleware to their app instance.
     """
 
     async def dispatch(self, request: Request, call_next) -> Response:

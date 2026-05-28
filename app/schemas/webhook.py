@@ -22,7 +22,7 @@ class WebhookUpdate(BaseModel):
 class WebhookResponse(BaseModel):
     id: int
     url: str
-    secret: str
+    secret_masked: str
     events: list[str]
     is_active: bool
     headers: dict | None = None
@@ -30,6 +30,23 @@ class WebhookResponse(BaseModel):
     updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_model(cls, obj):
+        """Create a response with masked secret from an ORM model."""
+        secret = obj.secret or ""
+        masked = f"****{secret[-4:]}" if len(secret) >= 4 else "****"
+        data = {
+            "id": obj.id,
+            "url": obj.url,
+            "secret_masked": masked,
+            "events": obj.events or [],
+            "is_active": obj.is_active,
+            "headers": obj.headers,
+            "created_at": obj.created_at,
+            "updated_at": obj.updated_at,
+        }
+        return cls(**data)
 
 
 class WebhookTestResponse(BaseModel):

@@ -63,7 +63,9 @@ async def get_canvas(
     db: AsyncSession = Depends(get_db),
 ) -> CanvasResponse:
     """Get a canvas by ID."""
-    result = await db.execute(select(Canvas).where(Canvas.id == canvas_id))
+    result = await db.execute(
+        select(Canvas).where(Canvas.id == canvas_id, Canvas.owner_id == current_user.id)
+    )
     canvas = result.scalar_one_or_none()
     if not canvas:
         raise HTTPException(status_code=404, detail="Canvas not found")
@@ -78,7 +80,9 @@ async def update_canvas(
     db: AsyncSession = Depends(get_db),
 ) -> CanvasResponse:
     """Update a canvas."""
-    result = await db.execute(select(Canvas).where(Canvas.id == canvas_id))
+    result = await db.execute(
+        select(Canvas).where(Canvas.id == canvas_id, Canvas.owner_id == current_user.id)
+    )
     canvas = result.scalar_one_or_none()
     if not canvas:
         raise HTTPException(status_code=404, detail="Canvas not found")
@@ -96,7 +100,9 @@ async def delete_canvas(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Delete a canvas."""
-    result = await db.execute(select(Canvas).where(Canvas.id == canvas_id))
+    result = await db.execute(
+        select(Canvas).where(Canvas.id == canvas_id, Canvas.owner_id == current_user.id)
+    )
     canvas = result.scalar_one_or_none()
     if not canvas:
         raise HTTPException(status_code=404, detail="Canvas not found")
@@ -116,7 +122,9 @@ async def create_canvas_item(
     db: AsyncSession = Depends(get_db),
 ) -> CanvasItemResponse:
     """Add an item to a canvas."""
-    result = await db.execute(select(Canvas).where(Canvas.id == canvas_id))
+    result = await db.execute(
+        select(Canvas).where(Canvas.id == canvas_id, Canvas.owner_id == current_user.id)
+    )
     canvas = result.scalar_one_or_none()
     if not canvas:
         raise HTTPException(status_code=404, detail="Canvas not found")
@@ -211,7 +219,9 @@ async def create_canvas_connection(
     db: AsyncSession = Depends(get_db),
 ) -> CanvasConnectionResponse:
     """Add a connection between two items in a canvas."""
-    result = await db.execute(select(Canvas).where(Canvas.id == canvas_id))
+    result = await db.execute(
+        select(Canvas).where(Canvas.id == canvas_id, Canvas.owner_id == current_user.id)
+    )
     canvas = result.scalar_one_or_none()
     if not canvas:
         raise HTTPException(status_code=404, detail="Canvas not found")
@@ -274,7 +284,9 @@ async def export_canvas(
     db: AsyncSession = Depends(get_db),
 ) -> CanvasExport:
     """Export a canvas in Obsidian .canvas format."""
-    result = await db.execute(select(Canvas).where(Canvas.id == canvas_id))
+    result = await db.execute(
+        select(Canvas).where(Canvas.id == canvas_id, Canvas.owner_id == current_user.id)
+    )
     canvas = result.scalar_one_or_none()
     if not canvas:
         raise HTTPException(status_code=404, detail="Canvas not found")

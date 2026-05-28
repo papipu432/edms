@@ -29,7 +29,7 @@ async def list_webhooks(
     """List all webhook configurations."""
     result = await db.execute(select(WebhookConfig))
     webhooks = result.scalars().all()
-    return webhooks
+    return [WebhookResponse.from_orm_model(w) for w in webhooks]
 
 
 @router.get("/api/webhooks/{webhook_id}", response_model=WebhookResponse)
@@ -45,7 +45,7 @@ async def get_webhook(
     webhook = result.scalar_one_or_none()
     if webhook is None:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    return webhook
+    return WebhookResponse.from_orm_model(webhook)
 
 
 @router.post("/api/webhooks", response_model=WebhookResponse, status_code=201)
@@ -65,7 +65,7 @@ async def create_webhook(
     db.add(webhook)
     await db.flush()
     await db.refresh(webhook)
-    return webhook
+    return WebhookResponse.from_orm_model(webhook)
 
 
 @router.put("/api/webhooks/{webhook_id}", response_model=WebhookResponse)
@@ -89,7 +89,7 @@ async def update_webhook(
 
     await db.flush()
     await db.refresh(webhook)
-    return webhook
+    return WebhookResponse.from_orm_model(webhook)
 
 
 @router.delete("/api/webhooks/{webhook_id}", status_code=204)
