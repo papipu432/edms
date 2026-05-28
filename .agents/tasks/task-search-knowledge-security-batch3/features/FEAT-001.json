@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Search & Knowledge features: Natural language queries, Knowledge graph visualization, Comparative analysis, and OCR confidence scoring",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Natural Language Search: Create app/schemas/natural_search.py with NaturalSearchRequest (query: str) and NaturalSearchResponse (interpreted_query: dict with fields group_id, lifecycle_state, date_from, date_to, keywords, file_type; results: list of FacetedSearchResult; raw_query: str; parse_method: str). Create app/services/natural_search.py with NaturalSearchService class that: (a) uses PromptGuard to sanitize input, (b) calls LLM (using get_chat_model() from app/core/llm.py) with a system prompt asking it to parse user query into JSON with fields {group_id, lifecycle_state, date_from, date_to, keywords, file_type}, (c) parses LLM JSON response into a FacetedSearchRequest, (d) calls EnhancedSearchService.faceted_search() with the structured query, (e) if LLM parsing fails or returns invalid JSON, falls back to vector search using VectorDBService. Add POST /api/search/natural endpoint in app/api/search.py that accepts NaturalSearchRequest and returns NaturalSearchResponse. Requires get_current_user authentication.",
     "Step 2 - Knowledge Graph Visualization: Create app/schemas/knowledge_graph.py with KnowledgeGraphRequest (filters: document_id optional, group_id optional, entity optional str, relationship_type optional str) and KnowledgeGraphResponse (nodes: list of KGNode with id, label, type (document/entity/topic/group), metadata dict; edges: list of KGEdge with source, target, type, label). Create app/services/knowledge_graph.py with KnowledgeGraphService class that queries DocumentRelationship, Document, Group tables and builds a graph with: document nodes (from documents table), group nodes, entity/topic nodes (extracted from document keywords JSON field), and edges from document_relationships table plus inferred edges (document->group membership, document->entity/topic based on keywords). Add GET /api/knowledge-graph endpoint in a new app/api/knowledge_graph.py with query params: document_id, group_id, entity, relationship_type. Also add GET /api/knowledge-graph/view that returns an HTML page (app/templates/knowledge_graph.html) using vis.js Network via CDN (https://unpkg.com/vis-network/standalone/umd/vis-network.min.js) that fetches graph data from the API and renders an interactive force-directed graph. Support filtering controls in the HTML page. Register router in app/api/router.py.",
@@ -28,5 +28,5 @@
     "uv run python -m pytest tests/ -x -q (all tests pass)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 4 steps implemented successfully. 772 tests pass (29 new tests added). Mock paths for LLM need to reference app.services.natural_search.get_chat_model for the service and app.api.compare.get_chat_model for the compare endpoint. generate_embeddings must be patched at app.core.llm.generate_embeddings since it is imported inside the fallback method."
 }
