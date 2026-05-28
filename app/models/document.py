@@ -46,6 +46,7 @@ class Document(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    extracted_fields: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")
 
     group: Mapped["Group"] = relationship(back_populates="documents")  # noqa: F821

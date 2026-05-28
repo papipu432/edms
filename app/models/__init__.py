@@ -11,6 +11,9 @@ from app.models.lifecycle import (
     LifecycleType,
 )
 from app.models.security import MonitoringConfig, SecurityAlert
+from app.models.smart_folder import SmartFolder
+from app.models.tag import DocumentTag, Tag
+from app.models.template import DocumentTemplate
 from app.models.user import (
     FolderAssignment,
     LdapConfig,
@@ -41,6 +44,8 @@ __all__ = [
     "DocumentAuditLog",
     "DocumentLifecycle",
     "DocumentLifecycleState",
+    "DocumentTag",
+    "DocumentTemplate",
     "DocumentVersion",
     "EncryptionKey",
     "FolderAssignment",
@@ -50,6 +55,8 @@ __all__ = [
     "LifecycleType",
     "MonitoringConfig",
     "SecurityAlert",
+    "SmartFolder",
+    "Tag",
     "LdapConfig",
     "LdapGroupRole",
     "LdapSyncLog",

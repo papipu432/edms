@@ -44,6 +44,7 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(256), unique=True, index=True)
     hashed_password: Mapped[str | None] = mapped_column(String(256))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     is_ldap: Mapped[bool] = mapped_column(Boolean, default=False)
     ldap_dn: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

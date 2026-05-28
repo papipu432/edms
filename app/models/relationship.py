@@ -13,6 +13,7 @@ class RelationshipType(str, enum.Enum):
     related = "related"
     supersedes = "supersedes"
     references = "references"
+    cites = "cites"
 
 
 class DocumentRelationship(Base):
