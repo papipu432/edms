@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "HTML templates for all UX features: drag-and-drop dashboard, Kanban board, command palette (injected into base.html), inline PDF viewer, breadcrumb navigation, activity feed/timeline, batch tagging + smart folders pages, onboarding tour, and template management page.",
+  "status": "pending",
+  "steps": [
+    "1. Update app/templates/base.html: Add command palette modal overlay (hidden by default, triggered by Ctrl+K/Cmd+K). Markup: fixed overlay with dark backdrop, centered modal with search input, results list. JS: keydown listener for Ctrl+K/Cmd+K, debounced fetch to /api/command-palette/search?q=..., render results dynamically, navigate on selection. Also add onboarding tour container div and associated JS.",
+    "2. Update app/templates/dashboard.html: Convert group sidebar items to drag-and-drop folder cards. Each group card has a drop zone. Use HTML5 drag-and-drop API (dragover, drop events). On file drop, POST to /api/bulk/upload with group_id. Show upload progress indicator. Keep existing functionality intact.",
+    "3. Create app/templates/kanban.html: Full-page Kanban board with 6 columns (Draft, In Review, Approved, Up To Date, Needs Re-Review, Expired). Each column shows document cards. Cards are draggable between columns. On drop in new column, call POST /api/documents/{id}/lifecycle/transition with target_state. Use Tailwind for styling, vanilla JS for drag-and-drop. Include htmx for partial refreshes.",
+    "4. Create app/templates/pdf_viewer.html: Inline PDF viewer page using Mozilla pdf.js from CDN (https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js and pdf.worker.min.js). Fetch PDF content via /api/documents/{id}/preview. Include toolbar with: page navigation (prev/next, page number input), zoom (in/out/fit), print button. Render PDF pages to canvas elements.",
+    "5. Create app/templates/activity.html: Activity feed page. Global timeline showing recent actions. Each entry: icon, actor name, action description, timestamp, document link. Infinite scroll via htmx (hx-get with offset param, hx-trigger='revealed'). Connect to WebSocket for real-time updates (append new items to top).",
+    "6. Create app/templates/tags.html: Tag management page. Show all tags as colored badges. Create new tag form (name + color picker). List documents with their tags. Bulk tagging: select multiple documents, assign tags. Smart folders section: list existing smart folders, create new (name + query builder with status/keyword/date filters).",
+    "7. Create app/templates/templates.html: Template management page. List existing templates as cards. Create/edit template form with: name, description, required_fields (dynamic JSON field builder), default folder selector, default lifecycle type selector, extraction prompt textarea. 'Create Document from Template' button on each card.",
+    "8. Add breadcrumb partial: Create a reusable breadcrumb component. In dashboard.html and document_viewer.html, show breadcrumbs when viewing a group or document. Fetch from /api/groups/{id}/breadcrumbs and render as 'Home > Group > Subgroup > ...' with clickable links.",
+    "9. Add onboarding tour logic to base.html scripts block: On first login (check /api/onboarding/status), show step-by-step tooltip overlays highlighting: upload button, search (command palette), lifecycle/kanban link, wiki link, chat. Each step has a 'Next' button. On finish, POST /api/onboarding/complete. Use absolute positioning with z-index for overlays.",
+    "10. Add page routes in app/api/pages.py: GET /kanban -> kanban.html, GET /documents/{id}/pdf -> pdf_viewer.html, GET /activity -> activity.html, GET /tags -> tags.html, GET /templates -> templates.html.",
+    "11. Update base.html navbar to include links to: Kanban, Activity, Tags, Templates."
+  ],
+  "acceptance_criteria": [
+    "All new pages render without errors (GET requests return 200)",
+    "Command palette activates with Ctrl+K and shows search results",
+    "Dashboard folder cards accept drag-and-drop file uploads",
+    "Kanban board displays documents in correct lifecycle columns",
+    "PDF viewer loads and displays PDF content from preview API",
+    "Activity feed shows audit log entries with infinite scroll",
+    "Tags page allows CRUD operations on tags",
+    "Templates page allows CRUD operations on templates",
+    "Breadcrumbs display for nested group hierarchies",
+    "Onboarding tour shows for new users and can be dismissed",
+    "All existing tests continue to pass"
+  ],
+  "verification": [
+    "uv run pytest tests/ -x -q",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

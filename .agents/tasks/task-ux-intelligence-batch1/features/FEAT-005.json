@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Tests for pipeline intelligence features (auto-tagging, form extraction, citation detection) and integration tests for the document intelligence services.",
+  "status": "pending",
+  "steps": [
+    "1. Create tests/test_auto_tagger.py: Test the auto_tagger service. Mock the LLM call (patch app.core.llm.chat_completion) to return known tag names. Verify tags are parsed correctly from LLM response.",
+    "2. Create tests/test_form_extractor.py: Test the form_extractor service. Mock LLM to return JSON key-value pairs. Test with default prompt and with custom template prompt.",
+    "3. Create tests/test_citation_detector.py: Test the citation_detector service. Mock LLM to return document IDs. Test it correctly maps references.",
+    "4. Update tests/test_pipeline.py if needed: Ensure existing pipeline tests still pass with the new steps. The new steps use LLM which is already mocked in pipeline tests. Add a test that verifies auto-tagging, form extraction, and citation detection are called during pipeline processing (mock them to ensure they don't break the flow).",
+    "5. Create tests/test_expiry_prediction_service.py: Test the expiry prediction logic. Create documents with lifecycle transitions at known timestamps, verify the prediction calculates reasonable averages."
+  ],
+  "acceptance_criteria": [
+    "All new test files pass",
+    "Full test suite passes (all original 620 + new tests)",
+    "Tests properly mock LLM calls (no real API calls in tests)",
+    "uv run ruff check app/ tests/ passes"
+  ],
+  "verification": [
+    "uv run pytest tests/test_auto_tagger.py tests/test_form_extractor.py tests/test_citation_detector.py -v",
+    "uv run pytest tests/ -x -q",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

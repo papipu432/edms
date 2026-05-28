@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Tests for all new API endpoints: tags CRUD, smart folders CRUD, templates CRUD, command palette search, activity feed, kanban board, breadcrumbs, expiry prediction, onboarding status. Follow existing test patterns in tests/conftest.py.",
+  "status": "in_progress",
+  "steps": [
+    "1. Create tests/test_tags.py: Test create tag, list tags, delete tag, add tag to document, remove tag from document, list document tags. Use the client fixture and create test user/document in each test.",
+    "2. Create tests/test_smart_folders.py: Test create smart folder, list smart folders, get by id, update, delete, execute query (GET /api/smart-folders/{id}/documents).",
+    "3. Create tests/test_templates.py: Test create template, list templates, get by id, update, delete, create document from template.",
+    "4. Create tests/test_command_palette.py: Test search returns documents matching query, groups matching query, empty results for no match.",
+    "5. Create tests/test_activity.py: Test global feed returns audit entries, per-document feed filters correctly, pagination works.",
+    "6. Create tests/test_kanban.py: Test kanban endpoint returns board with columns, documents correctly grouped by lifecycle state.",
+    "7. Create tests/test_breadcrumbs.py: Test breadcrumbs for nested groups (3 levels deep), root group has single breadcrumb.",
+    "8. Create tests/test_expiry_prediction.py: Test prediction endpoint returns prediction data, handles document without lifecycle gracefully.",
+    "9. Create tests/test_onboarding.py: Test GET status returns completed=False initially, POST complete sets it to True, subsequent GET returns True."
+  ],
+  "acceptance_criteria": [
+    "All new test files pass: uv run pytest tests/test_tags.py tests/test_smart_folders.py tests/test_templates.py tests/test_command_palette.py tests/test_activity.py tests/test_kanban.py tests/test_breadcrumbs.py tests/test_expiry_prediction.py tests/test_onboarding.py -v",
+    "Full test suite passes (620 + new tests)",
+    "Each test exercises real API endpoints with actual DB operations (not mocked)"
+  ],
+  "verification": [
+    "uv run pytest tests/test_tags.py tests/test_smart_folders.py tests/test_templates.py tests/test_command_palette.py tests/test_activity.py tests/test_kanban.py tests/test_breadcrumbs.py tests/test_expiry_prediction.py tests/test_onboarding.py -v",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

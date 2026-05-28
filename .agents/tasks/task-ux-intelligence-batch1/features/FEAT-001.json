@@ -1,0 +1,46 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Models + API foundation: Add Tag, SmartFolder, DocumentTemplate models; add extracted_fields and onboarding_completed columns; add citation relationship type; create API endpoints for tags, smart folders, templates, command palette search, activity feed, Kanban board, breadcrumbs, and expiry prediction. Register all new routers in app/api/router.py.",
+  "status": "completed",
+  "steps": [
+    "1. Create app/models/tag.py with Tag model (id, name, color, created_at) and DocumentTag association table (document_id FK to documents, tag_id FK to tags). Use integer PKs like existing models. Import Base from app/models/group.py.",
+    "2. Create app/models/smart_folder.py with SmartFolder model (id, name, description, query_json JSON column storing search criteria, owner_id FK to users, created_at, updated_at). Use integer PK.",
+    "3. Create app/models/template.py with DocumentTemplate model (id, name, description, required_fields JSON, default_folder_id FK to groups nullable, default_lifecycle_type String nullable, extraction_prompt Text nullable, created_at, updated_at). Use integer PK.",
+    "4. Add 'extracted_fields' column (JSON, nullable) to the Document model in app/models/document.py.",
+    "5. Add 'onboarding_completed' column (Boolean, default=False) to the User model in app/models/user.py.",
+    "6. Add 'cites' value to the RelationshipType enum in app/models/relationship.py.",
+    "7. Update app/models/__init__.py to import and export Tag, DocumentTag, SmartFolder, DocumentTemplate.",
+    "8. Create app/schemas/tag.py with TagCreate(name, color optional), TagResponse, DocumentTagResponse schemas.",
+    "9. Create app/schemas/smart_folder.py with SmartFolderCreate(name, description optional, query_json dict), SmartFolderResponse, SmartFolderResultsResponse schemas.",
+    "10. Create app/schemas/template.py with TemplateCreate(name, description, required_fields, default_folder_id optional, default_lifecycle_type optional, extraction_prompt optional), TemplateResponse schemas.",
+    "11. Create app/schemas/activity.py with ActivityEntry(id, document_id, action, actor_username, timestamp, details) and ActivityFeedResponse(entries, total) schemas.",
+    "12. Create app/schemas/kanban.py with KanbanCard(document_id, filename, state, updated_at, assigned_reviewer), KanbanBoard(columns dict mapping state to list of cards) schemas.",
+    "13. Create app/schemas/command_palette.py with CommandPaletteResult(type, id, title, url, description optional), CommandPaletteResponse(results list) schemas.",
+    "14. Create app/schemas/breadcrumb.py with BreadcrumbItem(id, name, url), BreadcrumbResponse(items list) schemas.",
+    "15. Create app/schemas/expiry_prediction.py with ExpiryPrediction(document_id, predicted_review_date, confidence, based_on_count int) schema.",
+    "16. Create app/api/tags.py: CRUD endpoints - POST /api/tags (create tag), GET /api/tags (list all), DELETE /api/tags/{id}, POST /api/documents/{id}/tags (add tag to doc), DELETE /api/documents/{id}/tags/{tag_id}, GET /api/documents/{id}/tags. Require get_current_user for all.",
+    "17. Create app/api/smart_folders.py: CRUD endpoints - POST /api/smart-folders, GET /api/smart-folders, GET /api/smart-folders/{id}, PUT /api/smart-folders/{id}, DELETE /api/smart-folders/{id}, GET /api/smart-folders/{id}/documents (executes the saved query). Require get_current_user.",
+    "18. Create app/api/templates.py: CRUD endpoints - POST /api/templates, GET /api/templates, GET /api/templates/{id}, PUT /api/templates/{id}, DELETE /api/templates/{id}, POST /api/templates/{id}/create-document (creates doc from template with pre-filled metadata). Require get_current_user.",
+    "19. Create app/api/command_palette.py: GET /api/command-palette/search?q=... endpoint that fuzzy-searches documents (original_filename, summary), groups (name), and returns results with type, id, title, url. Require get_current_user. Use SQL LIKE for simplicity.",
+    "20. Create app/api/activity.py: GET /api/activity/feed (global feed with pagination), GET /api/documents/{id}/activity (per-document feed). Query DocumentAuditLog ordered by timestamp desc. Require get_current_user.",
+    "21. Create app/api/kanban.py: GET /api/kanban (returns all documents with lifecycles grouped by state as KanbanBoard), reuse existing lifecycle transition endpoint for state changes. Require get_current_user.",
+    "22. Create app/api/breadcrumbs.py: GET /api/groups/{id}/breadcrumbs (walk parent_id chain to root, return BreadcrumbResponse). No auth required (public utility).",
+    "23. Create app/api/expiry_prediction.py: GET /api/documents/{id}/expiry-prediction endpoint. Calculate average lifecycle duration for documents in same folder/template, predict next review date. Require get_current_user.",
+    "24. Update app/api/router.py to import and include all new routers (tags, smart_folders, templates, command_palette, activity, kanban, breadcrumbs, expiry_prediction).",
+    "25. Create app/api/onboarding.py: GET /api/onboarding/status (returns {completed: bool}), POST /api/onboarding/complete (sets onboarding_completed=True). Require get_current_user.",
+    "26. Update app/api/router.py to also include onboarding router."
+  ],
+  "acceptance_criteria": [
+    "All new models are importable and tables are created on app startup via Base.metadata.create_all",
+    "All new API endpoints return correct responses (tested with pytest)",
+    "Existing 620 tests continue to pass",
+    "uv run ruff check app/ tests/ passes with no errors"
+  ],
+  "verification": [
+    "uv run pytest tests/ -x -q",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": "All 620 existing tests continue to pass. Lint clean. New models use integer PKs consistent with existing patterns. The onboarding_completed field was added after is_active in User model. The extracted_fields JSON column was added before current_version in Document model."
+}

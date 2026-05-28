@@ -1,0 +1,7 @@
+{
+  "task_id": "task-ux-intelligence-batch1",
+  "task_description": "Implement Batch 1 UX/UI + Document Intelligence features for EDMS: drag-and-drop dashboard, Kanban board, command palette, inline PDF viewer, breadcrumb navigation, activity feed, batch tagging + smart folders, onboarding tour, template system, form extraction, document expiry prediction, and citation graph.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}
