@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Bi-directional Obsidian sync import, Obsidian plugin specification, wiki graph view page, daily notes, and canvas/whiteboard - the Obsidian & Knowledge Integration features.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. OBSIDIAN SYNC IMPORT: Create app/services/obsidian_sync.py with ObsidianSyncService class. Accept a zip of markdown files, extract them, compare with existing wiki pages by computing file hashes (MD5/SHA256). Detect: new pages (in zip but not wiki), modified pages (hash differs), deleted pages (in wiki but not in zip). Conflict resolution: Obsidian wins for user-created pages (entities/, topics/), EDMS wins for auto-generated summaries (summaries/). Track sync state with a manifest JSON file at wiki_path/sync_manifest.json containing last_sync_timestamp and file_hashes dict.",
     "2. Create app/api/obsidian_sync.py with router prefix /api/wiki/sync. POST /api/wiki/sync/import endpoint that accepts a zip file upload (UploadFile), calls ObsidianSyncService to process the import, returns a sync result (pages_created, pages_updated, pages_deleted, conflicts list). Requires authentication via get_current_user.",
@@ -41,5 +41,5 @@
     "uv run pytest tests/ -x -q (full test suite passes)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 35 new tests pass. 872 existing tests pass (confirmed with --ignore of new test files). 2 pre-existing rate-limiter ordering failures (test_chat_enhanced, test_command_palette returning 429) are not caused by this feature - they pass in isolation. Canvas model uses int PK. Daily notes uses Document.created_at (not uploaded_at)."
 }
