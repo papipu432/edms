@@ -1,3 +1,4 @@
+from app.models.access_request import AccessRequest
 from app.models.annotation import Annotation
 from app.models.approval import (
     ApprovalChain,
@@ -21,6 +22,7 @@ from app.models.lifecycle import (
     LifecycleType,
 )
 from app.models.security import MonitoringConfig, SecurityAlert
+from app.models.session import SessionDocument, UserSession
 from app.models.smart_folder import SmartFolder
 from app.models.tag import DocumentTag, Tag
 from app.models.template import DocumentTemplate
@@ -47,6 +49,7 @@ from app.models.watermark import WatermarkConfig
 from app.models.workflow import WorkflowEntry
 
 __all__ = [
+    "AccessRequest",
     "Annotation",
     "ApprovalChain",
     "ApprovalDecision",
@@ -74,6 +77,7 @@ __all__ = [
     "LifecycleType",
     "MonitoringConfig",
     "SecurityAlert",
+    "SessionDocument",
     "SmartFolder",
     "Tag",
     "LdapConfig",
@@ -91,6 +95,7 @@ __all__ = [
     "RolePermission",
     "User",
     "UserRole",
+    "UserSession",
     "WatermarkConfig",
     "WorkflowEntry",
 ]

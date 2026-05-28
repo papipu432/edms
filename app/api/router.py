@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.access_request import router as access_request_router
 from app.api.activity import router as activity_router
 from app.api.annotations import router as annotations_router
 from app.api.auth import router as auth_router
@@ -16,6 +17,7 @@ from app.api.kanban import router as kanban_router
 from app.api.compliance import router as compliance_router
 from app.api.geofence import router as geofence_router
 from app.api.knowledge_graph import router as knowledge_graph_router
+from app.api.sessions import router as sessions_router
 from app.api.watermark import router as watermark_router
 from app.api.ldap import router as ldap_router
 from app.api.lifecycle import router as lifecycle_router
@@ -96,3 +98,5 @@ api_router.include_router(knowledge_graph_router)
 api_router.include_router(compliance_router)
 api_router.include_router(geofence_router)
 api_router.include_router(watermark_router)
+api_router.include_router(access_request_router)
+api_router.include_router(sessions_router)
