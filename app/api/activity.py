@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import require_permission
 from app.models.audit import DocumentAuditLog
 from app.models.document import Document
 from app.models.user import User
@@ -16,7 +16,7 @@ router = APIRouter(tags=["activity"])
 async def get_activity_feed(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("audit", "read")),
     db: AsyncSession = Depends(get_db),
 ):
     count_result = await db.execute(select(func.count(DocumentAuditLog.id)))
@@ -51,7 +51,7 @@ async def get_document_activity(
     document_id: int,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("audit", "read")),
     db: AsyncSession = Depends(get_db),
 ):
     document = await db.get(Document, document_id)

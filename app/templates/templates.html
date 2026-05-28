@@ -193,9 +193,14 @@ async function createFromTemplate(id) {
         body: JSON.stringify({})
     });
     if (resp.ok) {
-        const doc = await resp.json();
-        alert('Document created successfully');
-        window.location.href = '/documents/' + doc.id + '/view';
+        const data = await resp.json();
+        const fields = data.required_fields || {};
+        const fieldNames = Object.keys(fields);
+        if (fieldNames.length > 0) {
+            alert('Template "' + data.template_name + '" requires the following fields before creating a document: ' + fieldNames.join(', ') + '. Please upload a document to the folder and the template fields will be extracted automatically.');
+        } else {
+            alert('Template "' + data.template_name + '" is ready. Upload a document to the default folder to use this template.');
+        }
     }
 }
 

@@ -1,17 +1,28 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password
 from app.models.audit import DocumentAuditLog
 from app.models.document import Document, DocumentStatus
 from app.models.group import Group
-from app.models.user import User
+from app.models.user import Role, User, UserRole
 
 
 async def _create_user_and_token(
     db: AsyncSession, username: str = "actuser"
 ) -> tuple[User, str]:
+    """Create a user with admin role (grants audit:read via admin bypass)."""
+    # Ensure admin role exists
+    result = await db.execute(select(Role).where(Role.code == "admin"))
+    role = result.scalar_one_or_none()
+    if not role:
+        role = Role(code="admin", name="Administrator", description="Admin role", is_system=True)
+        db.add(role)
+        await db.flush()
+        await db.refresh(role)
+
     user = User(
         username=username,
         email=f"{username}@example.com",
@@ -21,6 +32,12 @@ async def _create_user_and_token(
     db.add(user)
     await db.flush()
     await db.refresh(user)
+
+    user_role = UserRole(user_id=user.id, role_id=role.id)
+    db.add(user_role)
+    await db.flush()
+    await db.refresh(user)
+
     token = create_access_token(data={"sub": user.username})
     return user, token
 
@@ -179,3 +196,27 @@ async def test_activity_requires_auth(client: AsyncClient, db_session: AsyncSess
     """Test activity feed requires authentication."""
     response = await client.get("/api/activity/feed")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_activity_feed_requires_audit_permission(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """Test activity feed returns 403 for user without audit:read permission."""
+    # Create a regular user without admin role
+    user = User(
+        username="noaudit",
+        email="noaudit@example.com",
+        display_name="No Audit User",
+        hashed_password=hash_password("password123"),
+    )
+    db_session.add(user)
+    await db_session.flush()
+    await db_session.refresh(user)
+    token = create_access_token(data={"sub": user.username})
+
+    response = await client.get(
+        "/api/activity/feed",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403

@@ -167,9 +167,16 @@ class PipelineService:
                         tag = Tag(name=tag_name)
                         db.add(tag)
                         await db.flush()
-                    # Create DocumentTag association
-                    doc_tag = DocumentTag(document_id=doc_id, tag_id=tag.id)
-                    db.add(doc_tag)
+                    # Check if DocumentTag association already exists
+                    existing_link = await db.execute(
+                        select(DocumentTag).where(
+                            DocumentTag.document_id == doc_id,
+                            DocumentTag.tag_id == tag.id,
+                        )
+                    )
+                    if existing_link.scalar_one_or_none() is None:
+                        doc_tag = DocumentTag(document_id=doc_id, tag_id=tag.id)
+                        db.add(doc_tag)
                 await db.flush()
             except Exception as tag_err:
                 logger.warning(
@@ -178,7 +185,13 @@ class PipelineService:
 
             # Form field extraction (non-critical - failures don't break pipeline)
             try:
-                extracted = extract_fields(sanitized_content)
+                extraction_prompt = None
+                if document.template_id:
+                    from app.models.template import DocumentTemplate
+                    template = await db.get(DocumentTemplate, document.template_id)
+                    if template and template.extraction_prompt:
+                        extraction_prompt = template.extraction_prompt
+                extracted = extract_fields(sanitized_content, extraction_prompt)
                 if extracted:
                     document.extracted_fields = extracted
                     await db.flush()

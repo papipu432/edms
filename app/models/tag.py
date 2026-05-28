@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.group import Base
@@ -19,6 +19,9 @@ class Tag(Base):
 
 class DocumentTag(Base):
     __tablename__ = "document_tags"
+    __table_args__ = (
+        UniqueConstraint("document_id", "tag_id", name="uq_document_tag"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     document_id: Mapped[int] = mapped_column(

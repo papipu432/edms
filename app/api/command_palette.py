@@ -12,6 +12,15 @@ from app.schemas.command_palette import CommandPaletteResponse, CommandPaletteRe
 router = APIRouter(tags=["command_palette"])
 
 
+def _escape_like(value: str) -> str:
+    """Escape special characters for SQL LIKE patterns."""
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
 @router.get("/api/command-palette/search", response_model=CommandPaletteResponse)
 async def search_command_palette(
     q: str = Query("", description="Search query"),
@@ -23,14 +32,15 @@ async def search_command_palette(
     if not q.strip():
         return CommandPaletteResponse(results=[])
 
-    search_term = f"%{q}%"
+    escaped_q = _escape_like(q)
+    search_term = f"%{escaped_q}%"
 
     # Search documents
     doc_result = await db.execute(
         select(Document)
         .where(
-            Document.original_filename.ilike(search_term)
-            | Document.summary.ilike(search_term)
+            Document.original_filename.ilike(search_term, escape="\\")
+            | Document.summary.ilike(search_term, escape="\\")
         )
         .limit(10)
     )
@@ -47,7 +57,7 @@ async def search_command_palette(
 
     # Search groups
     group_result = await db.execute(
-        select(Group).where(Group.name.ilike(search_term)).limit(10)
+        select(Group).where(Group.name.ilike(search_term, escape="\\")).limit(10)
     )
     for group in group_result.scalars().all():
         results.append(

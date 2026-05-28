@@ -17,6 +17,15 @@ from app.schemas.smart_folder import (
 router = APIRouter(tags=["smart_folders"])
 
 
+def _escape_like(value: str) -> str:
+    """Escape special characters for SQL LIKE patterns."""
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
 @router.post("/api/smart-folders", response_model=SmartFolderResponse, status_code=201)
 async def create_smart_folder(
     data: SmartFolderCreate,
@@ -55,7 +64,7 @@ async def get_smart_folder(
     db: AsyncSession = Depends(get_db),
 ):
     folder = await db.get(SmartFolder, folder_id)
-    if not folder:
+    if not folder or folder.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Smart folder not found")
     return folder
 
@@ -68,7 +77,7 @@ async def update_smart_folder(
     db: AsyncSession = Depends(get_db),
 ):
     folder = await db.get(SmartFolder, folder_id)
-    if not folder:
+    if not folder or folder.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Smart folder not found")
 
     if data.name is not None:
@@ -90,7 +99,7 @@ async def delete_smart_folder(
     db: AsyncSession = Depends(get_db),
 ):
     folder = await db.get(SmartFolder, folder_id)
-    if not folder:
+    if not folder or folder.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Smart folder not found")
     await db.delete(folder)
     await db.commit()
@@ -106,7 +115,7 @@ async def get_smart_folder_documents(
     db: AsyncSession = Depends(get_db),
 ):
     folder = await db.get(SmartFolder, folder_id)
-    if not folder:
+    if not folder or folder.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Smart folder not found")
 
     # Build query from query_json
@@ -115,9 +124,10 @@ async def get_smart_folder_documents(
         if "group_id" in folder.query_json:
             query = query.where(Document.group_id == folder.query_json["group_id"])
         if "filename_contains" in folder.query_json:
+            escaped = _escape_like(folder.query_json["filename_contains"])
             query = query.where(
                 Document.original_filename.ilike(
-                    f"%{folder.query_json['filename_contains']}%"
+                    f"%{escaped}%", escape="\\"
                 )
             )
         if "status" in folder.query_json:
