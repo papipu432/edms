@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Tests for all new API endpoints: tags CRUD, smart folders CRUD, templates CRUD, command palette search, activity feed, kanban board, breadcrumbs, expiry prediction, onboarding status. Follow existing test patterns in tests/conftest.py.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Create tests/test_tags.py: Test create tag, list tags, delete tag, add tag to document, remove tag from document, list document tags. Use the client fixture and create test user/document in each test.",
     "2. Create tests/test_smart_folders.py: Test create smart folder, list smart folders, get by id, update, delete, execute query (GET /api/smart-folders/{id}/documents).",
@@ -24,5 +24,5 @@
     "uv run pytest tests/ -x -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 49 new tests pass. Full suite is 669 tests (620 existing + 49 new). required_fields in TemplateCreate schema is dict[str, Any], not a list. Breadcrumbs endpoint does not require auth. All other endpoints require Bearer token auth."
 }
