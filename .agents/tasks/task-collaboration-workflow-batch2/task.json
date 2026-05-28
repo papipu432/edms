@@ -9,7 +9,7 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "All 740 tests pass after review fixes. Lint check passes. Review issues addressed: (1) approval step authorization with role/user/delegation checks, (2) private_key_pem rename with docstrings and error logging, (3) delegation integration in approval flow, (4) SLA dashboard SQL aggregation, (5) parallel approval semantics documented, (6) comments list auth comment, (7) advisory locks comment, (8) SLA breach concurrency comment."
+    "summary": "All 743 tests pass after review v2 fixes. Lint check passes. Review issues addressed: (1) Added 3 tests for approval authorization denial, role_code match, and delegation paths, (2) signature endpoint now returns 422 when private_key_pem is invalid, (3) _check_active_delegation filters by scope_type and scope_folder_id."
   }
 }
 
