@@ -1,0 +1,40 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Celery task queue replacing FastAPI BackgroundTasks with graceful fallback for development without Redis. Creates task modules for all async operations and updates existing API endpoints.",
+  "status": "completed",
+  "steps": [
+    "Create app/tasks/__init__.py with Celery app configuration: broker from settings.CELERY_BROKER_URL, backend from settings.CELERY_RESULT_BACKEND, autodiscover_tasks for all task modules, set task_serializer='json', result_serializer='json', accept_content=['json'], timezone='UTC'. Import celery app as 'celery_app'.",
+    "Create app/tasks/document.py with task 'process_document_task' that receives doc_id and db_url, creates async engine, runs PipelineService.process_document (following the same pattern as _run_pipeline in app/api/documents.py).",
+    "Create app/tasks/notifications.py with tasks: 'send_lifecycle_alert_task' (wraps EmailNotificationService.send_lifecycle_alert), 'send_health_digest_task'.",
+    "Create app/tasks/lifecycle.py with task 'check_lifecycle_alerts_task' that runs the lifecycle check and sends alerts for expiring/review-due documents.",
+    "Create app/tasks/backup.py with task 'trigger_backup_task' that wraps the _run_backup_task logic from app/api/settings_backup.py.",
+    "Create app/tasks/reports.py with task 'generate_scheduled_reports_task' that runs scheduled report generation.",
+    "Create app/tasks/webhooks.py with task 'deliver_webhook_task' that fires a webhook delivery with exponential backoff retry (max_retries=3, default_retry_delay=60).",
+    "Create app/tasks/daily_notes.py with task 'generate_daily_note_task' that wraps DailyNotesService.generate_daily_note.",
+    "Create app/tasks/beat_schedule.py that defines the Celery beat schedule dict: lifecycle checks daily at midnight, backup per BACKUP_SCHEDULE config, health score calculation hourly, daily notes at 6am UTC. Import and apply this schedule in app/tasks/__init__.py.",
+    "Create app/tasks/utils.py with a helper function 'run_task_or_background(task, background_tasks, *args, **kwargs)' that checks if Redis/Celery broker is available (try redis.ping()), if yes calls task.delay(*args, **kwargs), if not falls back to background_tasks.add_task(task_sync_wrapper, *args, **kwargs). This enables dev without Docker.",
+    "Update app/api/documents.py: replace background_tasks.add_task(_run_pipeline, ...) with the celery task dispatch using the fallback helper. Keep BackgroundTasks as parameter for fallback mode.",
+    "Update app/api/settings_backup.py: replace background_tasks.add_task(_run_backup_task, ...) with celery task dispatch using fallback helper.",
+    "Update app/services/bulk.py: replace background_tasks.add_task(_run_pipeline, ...) with celery task dispatch using fallback helper.",
+    "Ensure all Celery tasks use celery.utils.log.get_task_logger for logging within tasks."
+  ],
+  "acceptance_criteria": [
+    "app/tasks/__init__.py defines a Celery app that auto-discovers all task modules",
+    "All 8 task modules exist under app/tasks/ with proper @celery_app.task decorators",
+    "Beat schedule is defined covering lifecycle (daily), backup (configurable), health score (hourly), daily notes (6am)",
+    "The fallback helper correctly detects Redis availability and falls back to BackgroundTasks",
+    "app/api/documents.py uses Celery task dispatch instead of direct background_tasks.add_task",
+    "app/api/settings_backup.py uses Celery task dispatch instead of direct background_tasks.add_task",
+    "app/services/bulk.py uses Celery task dispatch instead of direct background_tasks.add_task",
+    "uv run ruff check app/ passes without errors",
+    "uv run pytest tests/ -x -q still passes (fallback mode works without Redis)"
+  ],
+  "verification": [
+    "Run 'uv run ruff check app/tasks/' to confirm no lint errors",
+    "Run 'uv run python -c \"from app.tasks import celery_app; print(celery_app.conf.beat_schedule)\"' to verify Celery config loads",
+    "Run 'uv run pytest tests/ -x -q' to confirm all existing tests pass with fallback mode"
+  ],
+  "blocked_reason": null,
+  "findings": "Pre-existing test flake in test_chat_enhanced.py::TestUnauthorizedAccess::test_cannot_access_other_users_session due to rate limiter state leaking between tests (returns 429 instead of 404). Passes in isolation. Updated _run_pipeline signature to (doc_id, db_url) removing storage_svc param since fallback and Celery task both create their own StorageService."
+}

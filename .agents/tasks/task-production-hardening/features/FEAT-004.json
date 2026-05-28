@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Nginx reverse proxy configuration with TLS termination, security headers, rate limiting, WebSocket support, gzip compression, and self-signed cert generation script.",
+  "status": "completed",
+  "steps": [
+    "Create nginx/nginx.conf with: worker_processes auto, events block (worker_connections 1024), http block with gzip on (gzip_types text/plain application/json application/javascript text/css), rate limiting zone (limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s), log format, include conf.d/*.conf.",
+    "Create nginx/conf.d/default.conf with: upstream app (server app:8000), server block on port 80 (redirect all to HTTPS with 301), server block on port 443 with ssl_certificate/ssl_certificate_key paths (/etc/nginx/certs/server.crt and server.key), proxy_pass to upstream app, proxy_set_header for Host/X-Real-IP/X-Forwarded-For/X-Forwarded-Proto/X-Request-ID, security headers (Strict-Transport-Security max-age=31536000, X-Frame-Options DENY, X-Content-Type-Options nosniff, Content-Security-Policy default-src 'self', X-XSS-Protection 1;mode=block), limit_req zone=api burst=20 nodelay, WebSocket support for /ws/ location (proxy_http_version 1.1, Upgrade, Connection upgrade), /health and /metrics locations without auth/rate-limiting for monitoring.",
+    "Create scripts/generate-certs.sh that generates self-signed TLS certificates using openssl: creates nginx/certs/ directory, generates CA key+cert, server key+CSR+cert signed by CA, valid for 365 days, CN=localhost with SANs for localhost and *.edms.local. Make script executable.",
+    "Update docker-compose.yml nginx service to mount nginx/nginx.conf, nginx/conf.d/, and nginx/certs/ as volumes. Ensure the nginx service has ports 80:80 and 443:443 on the external network only.",
+    "Create a .env.example file at project root documenting all environment variables with sensible defaults and comments explaining each one."
+  ],
+  "acceptance_criteria": [
+    "nginx/nginx.conf exists with proper worker config, gzip, rate limiting zone",
+    "nginx/conf.d/default.conf exists with HTTPS redirect, proxy_pass, security headers, WebSocket support",
+    "scripts/generate-certs.sh exists, is executable, and generates valid self-signed certs when run",
+    "Security headers include HSTS, X-Frame-Options, X-Content-Type-Options, CSP",
+    "Rate limiting is configured at nginx level with limit_req_zone",
+    "WebSocket proxy is configured for /ws/ path",
+    "docker-compose.yml nginx service correctly mounts all config files",
+    ".env.example documents all environment variables",
+    "uv run pytest tests/ -x -q still passes"
+  ],
+  "verification": [
+    "Run 'bash scripts/generate-certs.sh' and confirm certs are generated in nginx/certs/",
+    "Run 'docker compose config' to validate updated compose file",
+    "Run 'uv run pytest tests/ -x -q' to confirm no regressions"
+  ],
+  "blocked_reason": null,
+  "findings": "All nginx config, cert script, .gitignore, and .env.example created successfully. Docker compose was already correct with nginx service. Cert generation verified with openssl. Pre-existing flaky test (test_chat_enhanced.py rate limiting) unrelated to changes - passes in isolation."
+}

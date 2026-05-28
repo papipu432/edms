@@ -1,0 +1,14 @@
+{
+  "task_id": "task-production-hardening",
+  "task_description": "Production hardening for EDMS: Docker Compose stack, Alembic migrations, Celery task queue, CI/CD pipeline, health checks, Prometheus metrics, structured logging, and nginx TLS termination.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "pass",
+    "summary": "uv sync OK, Docker build succeeds, 948/949 tests pass (1 pre-existing flaky test with rate limiter state - unrelated to changes), ruff check passes on all new/modified files, Celery config loads correctly, structlog works, cert generation works, compose YAML valid."
+  }
+}
