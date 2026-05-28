@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -15,7 +15,7 @@ from app.models.approval import (
     ApprovalStep,
     ApprovalType,
 )
-from app.models.delegation import Delegation
+from app.models.delegation import Delegation, DelegationScopeType
 from app.models.document import Document
 from app.models.user import User
 from app.schemas.approval import (
@@ -192,10 +192,21 @@ async def submit_for_approval(
 
 
 async def _check_active_delegation(
-    db: AsyncSession, delegator_id: str, delegate_id: str
+    db: AsyncSession, delegator_id: str, delegate_id: str, folder_id: int | None = None
 ) -> bool:
-    """Check if delegate_id has an active delegation from delegator_id."""
+    """Check if delegate_id has an active delegation from delegator_id.
+
+    Only considers delegations where scope_type == 'all' or
+    (scope_type == 'folder' and scope_folder_id matches the chain's folder_id).
+    """
     now = datetime.now(timezone.utc)
+
+    scope_filter = or_(
+        Delegation.scope_type == DelegationScopeType.all,
+        (Delegation.scope_type == DelegationScopeType.folder)
+        & (Delegation.scope_folder_id == folder_id),
+    )
+
     result = await db.execute(
         select(Delegation).where(
             Delegation.delegator_id == delegator_id,
@@ -203,6 +214,7 @@ async def _check_active_delegation(
             Delegation.is_active == True,  # noqa: E712
             Delegation.start_date <= now,
             Delegation.end_date >= now,
+            scope_filter,
         )
     )
     return result.scalar_one_or_none() is not None
@@ -242,6 +254,10 @@ async def decide_approval(
     is_admin = "admin" in current_user.role_codes
     via_delegation = False
 
+    # Get the chain's folder_id for delegation scope checking
+    chain = await db.get(ApprovalChain, approval_request.chain_id)
+    chain_folder_id = chain.folder_id if chain else None
+
     if not is_admin:
         authorized = False
 
@@ -257,7 +273,7 @@ async def decide_approval(
         # Check if user holds an active delegation from the assigned user
         if not authorized and current_step.user_id:
             if await _check_active_delegation(
-                db, current_step.user_id, current_user.id
+                db, current_step.user_id, current_user.id, chain_folder_id
             ):
                 authorized = True
                 via_delegation = True

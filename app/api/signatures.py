@@ -73,6 +73,10 @@ async def sign_document(
     certificate_data = None
     if data and data.private_key_pem:
         certificate_data = sign_with_certificate(content_bytes, data.private_key_pem)
+        if certificate_data is None:
+            raise HTTPException(
+                status_code=422, detail="Invalid private key or signing failed"
+            )
 
     signature = DocumentSignature(
         document_id=document_id,

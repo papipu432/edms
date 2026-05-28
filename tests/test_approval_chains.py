@@ -359,3 +359,167 @@ async def test_create_chain_requires_admin(client: AsyncClient, db_session: Asyn
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_decide_approval_denied_without_required_role(client: AsyncClient, db_session: AsyncSession):
+    """Non-admin user without the step's required role_code gets 403."""
+    admin_user, admin_token = await _create_user_with_roles(db_session, ["admin"], username="admin_user2")
+
+    group = Group(name="Auth Deny Group")
+    db_session.add(group)
+    await db_session.flush()
+    await db_session.refresh(group)
+
+    # Create chain with step requiring 'reviewer' role
+    await client.post(
+        "/api/approval-chains",
+        json={
+            "name": "Auth Deny Chain",
+            "folder_id": group.id,
+            "steps": [
+                {"step_order": 1, "approval_type": "sequential", "role_code": "reviewer"},
+            ],
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    doc = await _create_document(db_session, group=group)
+
+    # Submit for approval as admin
+    submit_resp = await client.post(
+        f"/api/documents/{doc.id}/approval-requests",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    request_id = submit_resp.json()["id"]
+
+    # Create a non-admin user with 'editor' role (not 'reviewer')
+    editor_user, editor_token = await _create_user_with_roles(db_session, ["editor"], username="editor_deny")
+
+    # Attempt to decide - should get 403
+    resp = await client.post(
+        f"/api/approval-requests/{request_id}/decide",
+        json={"decision": "approved", "comment": "Should fail"},
+        headers={"Authorization": f"Bearer {editor_token}"},
+    )
+    assert resp.status_code == 403
+    assert "Not authorized" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_decide_approval_with_correct_role(client: AsyncClient, db_session: AsyncSession):
+    """Non-admin user with the step's required role_code CAN decide."""
+    admin_user, admin_token = await _create_user_with_roles(db_session, ["admin"], username="admin_role_test")
+
+    group = Group(name="Role Match Group")
+    db_session.add(group)
+    await db_session.flush()
+    await db_session.refresh(group)
+
+    # Create chain with step requiring 'reviewer' role
+    await client.post(
+        "/api/approval-chains",
+        json={
+            "name": "Role Match Chain",
+            "folder_id": group.id,
+            "steps": [
+                {"step_order": 1, "approval_type": "sequential", "role_code": "reviewer"},
+            ],
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    doc = await _create_document(db_session, group=group)
+
+    # Submit for approval as admin
+    submit_resp = await client.post(
+        f"/api/documents/{doc.id}/approval-requests",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    request_id = submit_resp.json()["id"]
+
+    # Create a non-admin user with 'reviewer' role
+    reviewer_user, reviewer_token = await _create_user_with_roles(
+        db_session, ["reviewer"], username="reviewer_match"
+    )
+
+    # Attempt to decide - should succeed
+    resp = await client.post(
+        f"/api/approval-requests/{request_id}/decide",
+        json={"decision": "approved", "comment": "Reviewed and approved"},
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+    )
+    assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_decide_approval_via_delegation(client: AsyncClient, db_session: AsyncSession):
+    """User with an active delegation from the step's assigned user can decide."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.delegation import Delegation
+
+    admin_user, admin_token = await _create_user_with_roles(db_session, ["admin"], username="admin_deleg_test")
+
+    group = Group(name="Delegation Group")
+    db_session.add(group)
+    await db_session.flush()
+    await db_session.refresh(group)
+
+    # Create an assigned user (the step will be assigned to this user)
+    assigned_user, _assigned_token = await _create_user_with_roles(
+        db_session, ["editor"], username="assigned_user"
+    )
+
+    # Create chain with step assigned to the specific user
+    await client.post(
+        "/api/approval-chains",
+        json={
+            "name": "Delegation Chain",
+            "folder_id": group.id,
+            "steps": [
+                {
+                    "step_order": 1,
+                    "approval_type": "sequential",
+                    "user_id": assigned_user.id,
+                },
+            ],
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    doc = await _create_document(db_session, group=group)
+
+    # Submit for approval as admin
+    submit_resp = await client.post(
+        f"/api/documents/{doc.id}/approval-requests",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    request_id = submit_resp.json()["id"]
+
+    # Create a delegate user (non-admin, does not have the assigned role)
+    delegate_user, delegate_token = await _create_user_with_roles(
+        db_session, ["editor"], username="delegate_user"
+    )
+
+    # Create an active delegation from assigned_user to delegate_user with scope 'all'
+    now = datetime.now(timezone.utc)
+    delegation = Delegation(
+        delegator_id=assigned_user.id,
+        delegate_id=delegate_user.id,
+        start_date=now - timedelta(days=1),
+        end_date=now + timedelta(days=1),
+        scope_type="all",
+        is_active=True,
+    )
+    db_session.add(delegation)
+    await db_session.flush()
+
+    # Attempt to decide as delegate - should succeed
+    resp = await client.post(
+        f"/api/approval-requests/{request_id}/decide",
+        json={"decision": "approved", "comment": "Approved as delegate"},
+        headers={"Authorization": f"Bearer {delegate_token}"},
+    )
+    assert resp.status_code == 201
+    assert "delegation" in resp.json()["comment"].lower()
