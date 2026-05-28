@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Tests for pipeline intelligence features (auto-tagging, form extraction, citation detection) and integration tests for the document intelligence services.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "1. Create tests/test_auto_tagger.py: Test the auto_tagger service. Mock the LLM call (patch app.core.llm.chat_completion) to return known tag names. Verify tags are parsed correctly from LLM response.",
     "2. Create tests/test_form_extractor.py: Test the form_extractor service. Mock LLM to return JSON key-value pairs. Test with default prompt and with custom template prompt.",
