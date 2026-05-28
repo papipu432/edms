@@ -585,3 +585,275 @@ The wizard handles:
 5. LLM provider selection (OpenAI/Ollama)
 6. SMTP email configuration
 7. `.env` file generation
+
+---
+
+## Multi-Tenant Architecture
+
+EDMS supports multi-tenant deployments with full data isolation:
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                    Multi-Tenant Architecture                       │
+│                                                                   │
+│  Request Flow:                                                    │
+│    Client -> TenantMiddleware -> Route Handler -> DB (filtered)   │
+│                                                                   │
+│  TenantMiddleware:                                                │
+│    1. Extract tenant slug from X-Tenant-ID header or subdomain    │
+│    2. Resolve Tenant record from DB                               │
+│    3. Attach tenant context to request state                      │
+│    4. All subsequent queries filter by tenant_id                  │
+│                                                                   │
+│  Isolation Guarantees:                                            │
+│    - Database: All queries scoped to tenant_id                    │
+│    - Storage: Separate directory per tenant                       │
+│    - Settings: Per-tenant configuration via JSON settings column  │
+│    - Users: Users belong to exactly one tenant                    │
+│                                                                   │
+│  Model: Tenant                                                    │
+│    - id, name, slug (unique), settings (JSON), is_active          │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Approval Chain Engine
+
+The multi-stage approval system supports both sequential and parallel approval flows:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    Approval Chain Engine                            │
+│                                                                    │
+│  ApprovalChain                                                     │
+│    ├── Steps (ordered by step_order)                               │
+│    │     ├── Step 1: sequential (one user/role must approve)       │
+│    │     ├── Step 2: parallel (all users with role must approve)   │
+│    │     └── Step N: ...                                           │
+│    │                                                               │
+│    └── Requests (per document submission)                          │
+│          ├── Status: pending -> approved/rejected                  │
+│          ├── current_step_order: tracks progress                   │
+│          └── Decisions (per step per user)                         │
+│                                                                    │
+│  Flow:                                                             │
+│    1. Document submitted to chain                                  │
+│    2. ApprovalRequest created (pending, step 1)                    │
+│    3. Users with matching role/user_id notified                    │
+│    4. Decisions collected for current step                         │
+│    5. If step passes -> advance to next step                       │
+│    6. If all steps pass -> request status = approved               │
+│    7. If any step rejected -> request status = rejected            │
+│                                                                    │
+│  Delegation Support:                                               │
+│    - Before checking role match, system checks active delegations  │
+│    - Delegate can approve on behalf of delegator                   │
+│    - Delegation filtered by scope_type and scope_folder_id         │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## SLA Engine
+
+The SLA tracking system monitors document workflow completion times:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                         SLA Engine                                  │
+│                                                                    │
+│  SLAPolicy -> defines max_duration_hours per action per folder     │
+│                                                                    │
+│  DocumentSLA -> tracks individual document against policy          │
+│    - started_at: when the clock starts (e.g., submit for review)   │
+│    - deadline_at: started_at + max_duration_hours                  │
+│    - status: on_time | at_risk | breached | completed              │
+│    - escalated: boolean flag when escalation triggered             │
+│                                                                    │
+│  Status Calculation:                                               │
+│    on_time:   remaining > 25% of total time                        │
+│    at_risk:   remaining <= 25% of total time                       │
+│    breached:  deadline_at < now                                    │
+│    completed: action performed before deadline                     │
+│                                                                    │
+│  Escalation:                                                       │
+│    When status transitions to breached:                            │
+│    - Notification sent to escalation_role users                    │
+│    - escalated flag set to true                                    │
+│    - SLA breach event emitted for webhook delivery                 │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Knowledge Graph Data Model
+
+The knowledge graph connects documents, entities, and relationships in a navigable network:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                   Knowledge Graph Data Model                        │
+│                                                                    │
+│  Nodes (from knowledge_graph_service.build_graph):                 │
+│    - Document nodes: id, label (filename), type, group             │
+│    - Entity nodes: extracted from wiki entities/ directory         │
+│    - Topic nodes: extracted from wiki topics/ directory            │
+│                                                                    │
+│  Edges:                                                            │
+│    - document -> entity (mentions): doc references the entity      │
+│    - document -> document (relationship): typed document links     │
+│    - entity -> entity (related): cross-references in wiki          │
+│                                                                    │
+│  Visualization:                                                    │
+│    - vis.js network graph with physics simulation                  │
+│    - Filterable by document_id, group_id, entity, relationship     │
+│    - Color-coded by node type (blue=doc, green=entity, orange=topic)│
+│    - Interactive: click nodes to navigate, drag to rearrange       │
+│                                                                    │
+│  Data Sources:                                                     │
+│    - document_relationships table (explicit typed links)           │
+│    - Wiki entities/ and topics/ (extracted knowledge)              │
+│    - Document keywords (implicit entity mentions)                  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Geo-Fencing Middleware
+
+The geo-fencing middleware intercepts requests and enforces location-based access rules:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                   Geo-Fencing Architecture                          │
+│                                                                    │
+│  Request -> GeoFenceMiddleware -> Route Handler                    │
+│                                                                    │
+│  Middleware Logic:                                                  │
+│    1. Extract client IP from request (X-Forwarded-For or direct)   │
+│    2. Load active GeoFenceRules from database                      │
+│    3. For each rule (ordered by scope specificity):                │
+│       a. Check IP against allowed/denied ranges (CIDR matching)    │
+│       b. Check country (if GeoIP lookup available)                 │
+│       c. If rule matches and action=deny -> return 403             │
+│       d. If rule matches and action=allow -> pass through          │
+│    4. Default: allow if no rules match                             │
+│                                                                    │
+│  Rule Scopes:                                                      │
+│    - global: applies to all requests                               │
+│    - group: applies to requests for specific folder/group          │
+│    - document: applies to specific document access                 │
+│                                                                    │
+│  Configuration per Rule:                                           │
+│    - allowed_ip_ranges: JSON list of CIDR ranges                   │
+│    - denied_ip_ranges: JSON list of blocked CIDR ranges            │
+│    - allowed_countries: JSON list of ISO country codes              │
+│    - denied_countries: JSON list of blocked countries               │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Webhook Delivery System
+
+EDMS delivers outbound webhooks for system events with HMAC signature verification:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                   Webhook Delivery System                           │
+│                                                                    │
+│  Event Sources:                                                    │
+│    - Document lifecycle (created, approved, expired)                │
+│    - Workflow actions (submitted, approved, rejected)               │
+│    - SLA events (at_risk, breached)                                │
+│    - System events (backup completed, security alert)              │
+│                                                                    │
+│  Delivery Flow:                                                    │
+│    1. Event emitted by service layer                               │
+│    2. WebhookService queries active WebhookConfigs                 │
+│    3. Filter configs by event type (events JSON array)             │
+│    4. For each matching config:                                    │
+│       a. Build JSON payload with event data                        │
+│       b. Compute HMAC-SHA256 signature using config.secret         │
+│       c. POST to config.url with X-Webhook-Signature header        │
+│       d. Include custom headers from config.headers                │
+│                                                                    │
+│  Payload Format:                                                   │
+│    {                                                               │
+│      "event": "document.approved",                                 │
+│      "timestamp": "2024-01-15T10:30:00Z",                          │
+│      "data": { ... event-specific payload ... }                    │
+│    }                                                               │
+│                                                                    │
+│  Signature Verification (receiver side):                           │
+│    signature = HMAC-SHA256(secret, request_body)                   │
+│    Compare with X-Webhook-Signature header                         │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Offline Package Generation
+
+The offline mode creates self-contained document packages for disconnected access:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│              Offline Package Architecture                           │
+│                                                                    │
+│  Input: list of document_ids or group_id                           │
+│                                                                    │
+│  Package Contents (ZIP):                                           │
+│    ├── index.html          # Self-contained HTML viewer            │
+│    ├── documents/          # Document files and markdown           │
+│    │   ├── 1_report.pdf                                            │
+│    │   ├── 1_report.md                                             │
+│    │   └── 2_policy.pdf                                            │
+│    ├── metadata.json       # Document metadata and relationships   │
+│    └── styles.css          # Embedded viewer styles                │
+│                                                                    │
+│  HTML Viewer Features:                                             │
+│    - Document list with search/filter                              │
+│    - Markdown rendering                                            │
+│    - Metadata display (status, dates, keywords)                    │
+│    - No server connection required                                 │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Canvas Data Model
+
+The canvas/whiteboard feature stores spatial arrangements of documents:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    Canvas Data Model                                │
+│                                                                    │
+│  Canvas                                                            │
+│    ├── id, name, owner_id, created_at                              │
+│    ├── items: list[CanvasItem]                                     │
+│    │     ├── document_id (nullable, links to document)             │
+│    │     ├── note_text (nullable, for text-only notes)             │
+│    │     ├── x_position, y_position (float coordinates)            │
+│    │     ├── width, height (float dimensions)                      │
+│    │     └── color (optional hex color)                            │
+│    └── connections: list[CanvasConnection]                         │
+│          ├── from_item_id -> CanvasItem                            │
+│          ├── to_item_id -> CanvasItem                              │
+│          └── label (optional edge label)                           │
+│                                                                    │
+│  Export Format (.canvas compatible with Obsidian):                  │
+│    {                                                               │
+│      "nodes": [                                                    │
+│        {"id": "...", "type": "file", "file": "...",                │
+│         "x": 100, "y": 200, "width": 250, "height": 150}          │
+│      ],                                                            │
+│      "edges": [                                                    │
+│        {"id": "...", "fromNode": "...", "toNode": "...",            │
+│         "label": "depends on"}                                     │
+│      ]                                                             │
+│    }                                                               │
+└────────────────────────────────────────────────────────────────────┘
+```

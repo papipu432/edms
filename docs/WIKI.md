@@ -503,3 +503,242 @@ GET /api/documents/{id}/dependencies
 ```
 
 Useful for impact analysis when updating or archiving documents.
+
+---
+
+## Bi-Directional Sync
+
+EDMS supports bi-directional synchronization with Obsidian vaults, allowing users to edit wiki content locally and sync changes back to the server.
+
+### Import from Obsidian
+
+Upload an Obsidian vault as a ZIP file to merge its content into the EDMS wiki:
+
+```
+POST /api/wiki/sync/import
+Content-Type: multipart/form-data
+File: obsidian-vault.zip
+```
+
+### Conflict Resolution Strategy
+
+When the same page exists in both EDMS and the imported vault:
+
+| Page Location | Who Wins | Rationale |
+|---------------|----------|-----------|
+| entities/ | Obsidian | User-curated content takes priority |
+| topics/ | Obsidian | User-curated content takes priority |
+| summaries/ | EDMS | Auto-generated from documents, EDMS is authoritative |
+| index.md | EDMS | System-maintained catalog |
+| log.md | EDMS | System audit log |
+
+### Import Response
+
+```json
+{
+  "imported": 15,
+  "updated": 3,
+  "skipped": 2,
+  "conflicts_resolved": 1,
+  "details": "Imported 15 new pages, updated 3 existing. Conflicts resolved using EDMS-wins for summaries/."
+}
+```
+
+### Workflow for Bi-Directional Sync
+
+1. **Export** the wiki from EDMS to Obsidian vault (ZIP or incremental sync)
+2. **Edit** pages locally in Obsidian (add notes, refine entities, create new topics)
+3. **Import** the modified vault back into EDMS
+4. EDMS merges changes and updates the knowledge base
+5. New documents processed by EDMS will further update entity/topic pages
+
+### Maximum Upload Size
+
+The import endpoint accepts vault ZIPs up to 50MB.
+
+---
+
+## Daily Notes
+
+EDMS generates LLM-powered daily notes that summarize recent document activity and system events.
+
+### Generating a Daily Note
+
+```
+POST /api/wiki/daily-note
+```
+
+The system uses an LLM to produce a digest covering:
+- Documents processed today
+- Lifecycle transitions that occurred
+- Upcoming reviews and expirations
+- Notable activity patterns
+
+### Daily Note Format
+
+```markdown
+# Daily Note - 2024-01-15
+
+## Documents Processed
+- policy-update.pdf (approved by admin)
+- q1-report.docx (uploaded to Engineering/Reports)
+
+## Lifecycle Activity
+- contract-2023.pdf transitioned to needs_re_review
+- nda-template.pdf expires in 5 days
+
+## Upcoming
+- 3 documents due for review this week
+- 1 lifecycle expiring tomorrow
+
+## Summary
+Active day with 5 documents processed and 2 lifecycle transitions...
+```
+
+### Browsing Daily Notes
+
+List all generated daily notes:
+```
+GET /api/wiki/daily-notes
+```
+
+Daily notes are stored in the `daily-notes/` subdirectory of the wiki.
+
+### Automation
+
+Set up a scheduled report or cron job to generate daily notes automatically:
+```bash
+0 7 * * * curl -X POST http://localhost:8000/api/wiki/daily-note \
+  -H "Authorization: Bearer $SERVICE_TOKEN" 2>/dev/null
+```
+
+---
+
+## Wiki Graph View
+
+The wiki graph view provides an interactive visualization of all wiki pages and their connections.
+
+### Accessing the Graph
+
+```
+GET /api/wiki/graph
+```
+
+Returns graph data in vis.js-compatible format:
+
+```json
+{
+  "nodes": [
+    {"id": "entities/openai.md", "label": "OpenAI", "type": "entity", "color": "#3b82f6"},
+    {"id": "topics/machine-learning.md", "label": "Machine Learning", "type": "topic", "color": "#f59e0b"},
+    {"id": "summaries/doc-1.md", "label": "doc-1", "type": "summary", "color": "#10b981"}
+  ],
+  "edges": [
+    {"from": "entities/openai.md", "to": "topics/machine-learning.md", "label": "related"}
+  ]
+}
+```
+
+### Node Types and Colors
+
+| Type | Color | Description |
+|------|-------|-------------|
+| entity | Blue (#3b82f6) | People, organizations, technologies |
+| topic | Orange (#f59e0b) | Concepts and themes |
+| summary | Green (#10b981) | Per-document summaries |
+
+### Edge Detection
+
+Edges are derived from:
+- Explicit links (`[[wikilinks]]`) between pages
+- Cross-references detected in page content
+- Document-entity relationships from the processing pipeline
+
+### Interactive Features
+
+The vis.js graph supports:
+- Physics-based layout with draggable nodes
+- Zoom and pan navigation
+- Click to view page content
+- Search/filter by page type
+- Cluster detection for related groups
+
+---
+
+## Canvas Integration
+
+The canvas system integrates with the wiki to provide spatial document arrangement.
+
+### Wiki Pages in Canvas
+
+You can add wiki pages to a canvas as reference items, creating a spatial map of knowledge relationships alongside documents.
+
+### Exporting to Obsidian
+
+Canvas exports use the `.canvas` format compatible with Obsidian Canvas:
+
+```json
+{
+  "nodes": [
+    {"id": "1", "type": "file", "file": "entities/openai.md", "x": 0, "y": 0, "width": 250, "height": 150}
+  ],
+  "edges": [
+    {"id": "1", "fromNode": "1", "toNode": "2", "label": "uses"}
+  ]
+}
+```
+
+### Use Cases
+
+- **Research Maps** - Arrange related documents and entities spatially to discover patterns
+- **Project Planning** - Lay out documents needed for a project with dependency arrows
+- **Knowledge Organization** - Group wiki entities and topics into visual clusters
+- **Onboarding** - Create guided reading paths through connected documents
+
+---
+
+## Obsidian Plugin
+
+EDMS provides a plugin specification for Obsidian that enables direct integration:
+
+### Plugin Features
+
+- **Sync Command** - Pull latest wiki changes into your vault
+- **Push Command** - Push local edits back to EDMS
+- **Ribbon Action** - Quick-access sync button
+- **Settings** - Configure EDMS server URL, API token, and sync interval
+
+### Configuration
+
+In the plugin settings:
+- **Server URL**: `http://your-edms-server:8000`
+- **API Token**: Your JWT token (or service account token)
+- **Sync Interval**: How often to check for changes (minutes)
+- **Conflict Strategy**: "Obsidian wins" or "EDMS wins" for conflicts
+
+### Vault Structure After Sync
+
+```
+Your Obsidian Vault/
+├── EDMS Wiki/
+│   ├── entities/
+│   │   ├── openai.md
+│   │   └── acme-corp.md
+│   ├── topics/
+│   │   ├── machine-learning.md
+│   │   └── security.md
+│   ├── summaries/
+│   │   └── doc-1.md
+│   ├── daily-notes/
+│   │   ├── 2024-01-14.md
+│   │   └── 2024-01-15.md
+│   └── index.md
+└── Your other notes...
+```
+
+### Recommended Companion Plugins
+
+- **Dataview** - Query wiki pages by frontmatter properties
+- **Graph View** - Visualize connections (built into Obsidian)
+- **Calendar** - Navigate daily notes by date
+- **Templater** - Create new pages matching wiki structure

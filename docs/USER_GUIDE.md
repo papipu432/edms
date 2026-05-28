@@ -421,6 +421,343 @@ Contact your administrator to change your password. If you authenticated via LDA
 10. **Compare before approving** - Use document comparison to verify changes between versions
 11. **Export to Obsidian** - Keep a local copy of the wiki for offline reference
 12. **Use chat sessions** - Have multi-turn conversations scoped to specific documents for focused research
+13. **Use the command palette** - Press Ctrl+K for quick access to any action
+14. **Drag and drop** - Drop files directly on folder cards in the dashboard for fast uploads
+15. **Use the Kanban board** - Visualize and manage document lifecycle stages by dragging between columns
+16. **Create templates** - Set up document templates for common document types to enforce consistency
+17. **Request access** - Use the access request workflow instead of asking admins directly
+18. **Use canvas** - Create spatial arrangements of related documents for visual project planning
+19. **Check knowledge graph** - Discover hidden connections between documents through the graph view
+20. **Natural language search** - Try describing what you want in plain English for smarter results
+
+---
+
+## Using the Command Palette
+
+The command palette provides quick access to any action from anywhere in the interface.
+
+### Opening the Palette
+
+Press **Ctrl+K** (or **Cmd+K** on Mac) to open the command palette.
+
+### Available Actions
+
+Type to search for commands:
+- **Navigate** - Jump to any group, document, or settings page
+- **Upload** - Quick upload a document
+- **Search** - Start a semantic search
+- **Create** - Create new groups, templates, or canvases
+- **Admin** - Access admin functions (if you have the role)
+
+### Keyboard Navigation
+
+- **Up/Down arrows** - Navigate results
+- **Enter** - Execute selected command
+- **Escape** - Close the palette
+
+---
+
+## Drag-and-Drop Uploads
+
+Upload documents quickly by dragging files from your file manager.
+
+### Dashboard Upload
+
+1. Navigate to the dashboard view
+2. Drag one or more files from your desktop/file manager
+3. Drop them on a folder card
+4. Files are automatically uploaded to that group
+5. Processing starts immediately
+
+### Supported Behaviors
+
+- Drop multiple files at once for batch upload
+- Drop on a specific folder card to target that group
+- The system shows a visual indicator when hovering over a valid drop target
+
+---
+
+## Using the Kanban Board
+
+The Kanban board provides a visual interface for managing document lifecycles.
+
+### Accessing the Board
+
+Navigate to `/kanban` or use the command palette to search "Kanban".
+
+### Board Layout
+
+Documents are organized into columns by lifecycle state:
+- **Draft** - New documents not yet submitted
+- **In Review** - Documents awaiting review
+- **Approved** - Documents that passed review
+- **Up to Date** - Active, valid documents
+- **Needs Re-Review** - Documents due for re-review
+- **Expired** - Documents past their expiration
+
+### Moving Documents
+
+Drag a document card from one column to another to trigger a lifecycle transition. Only valid transitions are allowed (invalid drops are rejected).
+
+### Filtering
+
+Use the filter controls above the board to:
+- Filter by group/folder
+- Filter by assigned reviewer
+- Show only your documents
+
+---
+
+## Managing Document Templates
+
+Templates define standard configurations for common document types.
+
+### What Templates Provide
+
+- **Required Fields** - Metadata fields that must be filled on upload
+- **Default Folder** - Automatic placement in the correct group
+- **Default Lifecycle** - Automatic lifecycle assignment (permanent, expiring, recurring)
+- **Extraction Prompt** - LLM prompt for automatic form data extraction
+
+### Using a Template
+
+When uploading a document:
+1. Select a template from the dropdown
+2. Fill in the required fields defined by the template
+3. The document is automatically placed in the template's default folder
+4. Lifecycle is assigned according to template settings
+5. If an extraction prompt is defined, the LLM extracts structured data after processing
+
+### Viewing Templates
+
+```
+GET /api/templates
+```
+
+---
+
+## Requesting Access to Resources
+
+If you need access to a document or group that is restricted:
+
+### Submit an Access Request
+
+```
+POST /api/request-access
+{
+  "resource_type": "document",
+  "resource_id": 5,
+  "reason": "Need to review for quarterly audit"
+}
+```
+
+### Track Your Request
+
+View your pending requests and their status:
+```
+GET /api/access-requests/mine
+```
+
+### Request Lifecycle
+
+1. **Pending** - Awaiting admin review
+2. **Approved** - Access granted (you can now view the resource)
+3. **Denied** - Access refused (contact admin for alternative arrangements)
+
+---
+
+## Using the Canvas/Whiteboard
+
+Canvas provides a spatial workspace for organizing documents visually.
+
+### Creating a Canvas
+
+1. Use the command palette or navigate to the canvas section
+2. Click "New Canvas" and give it a name
+3. Start adding items by dragging documents onto the canvas
+
+### Canvas Items
+
+- **Document Cards** - Link to actual documents in the system
+- **Text Notes** - Freeform text for annotations and labels
+- **Connections** - Lines between items showing relationships
+
+### Arranging Items
+
+- Drag items to reposition them
+- Resize items by dragging edges
+- Use colors to categorize items visually
+- Add labels to connections for clarity
+
+### Exporting
+
+Export your canvas in Obsidian-compatible `.canvas` format:
+```
+GET /api/canvas/{id}/export
+```
+
+The exported file can be opened directly in Obsidian.
+
+---
+
+## Viewing the Knowledge Graph
+
+The knowledge graph visualizes relationships between documents, entities, and topics.
+
+### Accessing the Graph
+
+Navigate to the knowledge graph view or use:
+```
+GET /api/knowledge-graph
+```
+
+### Understanding the Graph
+
+- **Blue nodes** - Documents
+- **Green nodes** - Entities (people, organizations, technologies)
+- **Orange nodes** - Topics (concepts, themes)
+- **Edges** - Relationships between nodes (mentions, references, related)
+
+### Interacting
+
+- Click a node to view details
+- Drag nodes to rearrange the layout
+- Use mouse wheel to zoom in/out
+- Filter by group, entity type, or relationship type
+
+### Filtering
+
+Narrow the graph to relevant content:
+```
+GET /api/knowledge-graph?group_id=1
+GET /api/knowledge-graph?entity=OpenAI
+GET /api/knowledge-graph?document_id=5
+```
+
+---
+
+## Natural Language Search
+
+Search for documents using plain English descriptions instead of keywords.
+
+### How It Works
+
+Type a natural description of what you are looking for:
+- "Documents approved last week in engineering"
+- "Contracts that mention data retention"
+- "Files uploaded by John this month"
+
+The system uses an LLM to translate your query into structured search filters.
+
+### Using Natural Language Search
+
+```
+POST /api/search/natural
+{"query": "policies that expire next month"}
+```
+
+The response includes both the interpreted filters and the matching documents.
+
+---
+
+## Offline Document Packages
+
+Access documents without an internet connection.
+
+### Generating a Package
+
+Create an offline package for selected documents:
+```
+POST /api/offline/generate
+{"document_ids": [1, 2, 3]}
+```
+
+Or for an entire group:
+```
+POST /api/offline/generate
+{"group_id": 1}
+```
+
+### Using Offline Packages
+
+1. Download the ZIP file
+2. Extract to any location
+3. Open `index.html` in a web browser
+4. Browse, read, and search documents - no server needed
+
+### What is Included
+
+- Document files (PDF, original format)
+- Markdown-rendered content
+- Document metadata (status, keywords, summary)
+- A searchable index
+
+---
+
+## Approval Workflows
+
+### Multi-Stage Approvals
+
+For documents requiring multiple levels of approval:
+
+1. An admin sets up an approval chain with sequential/parallel steps
+2. You submit your document to the chain
+3. Each step's approvers are notified
+4. Track progress as approvers make decisions
+5. Document is fully approved only when all steps pass
+
+### Checking Approval Status
+
+View where your document is in the approval process:
+```
+GET /api/approval-chains/requests?document_id=5
+```
+
+### Delegating Approval Authority
+
+If you will be unavailable, delegate your approval authority:
+```
+POST /api/delegations
+{
+  "delegate_id": "COLLEAGUE_USER_ID",
+  "start_date": "2024-01-15T00:00:00",
+  "end_date": "2024-01-22T23:59:59",
+  "scope_type": "all"
+}
+```
+
+---
+
+## Signing Documents
+
+### E-Signature
+
+Sign documents to create a verifiable proof of approval:
+```
+POST /api/documents/{id}/sign
+{"reason": "Final review approval"}
+```
+
+### What Happens When You Sign
+
+1. A SHA-256 hash of the document content is computed
+2. A signature record is created linking you to the document
+3. A QR code is generated for quick verification
+4. Optionally, an X.509 certificate can be used for stronger binding
+
+### Verifying Signatures
+
+Anyone with the verification URL or signature hash can verify:
+```
+GET /api/signatures/verify/{signature_hash}
+```
+
+### Viewing Document Signatures
+
+See all signatures on a document:
+```
+GET /api/documents/{id}/signatures
+```
 
 ---
 

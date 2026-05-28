@@ -507,6 +507,184 @@ The test suite covers all 5 detection categories:
 - System prompt injection (medium severity)
 - Ignore-instructions commands (high severity)
 
+## Multi-Tenant Development
+
+When developing multi-tenant features, be aware of the tenant isolation model:
+
+### Tenant Middleware
+
+The `app/middleware/tenant.py` middleware extracts tenant context from requests:
+
+```python
+# Tenant is resolved from X-Tenant-ID header
+# In development, if no header is present, the system operates without tenant filtering
+
+# To test tenant isolation:
+curl -H "X-Tenant-ID: acme" http://localhost:8000/api/documents
+```
+
+### Adding Tenant-Aware Models
+
+When creating a model that should be tenant-scoped:
+
+1. Add a `tenant_id` foreign key to the model
+2. Use the tenant context in queries to filter results
+3. The middleware provides `request.state.tenant` for access in route handlers
+
+### Testing Multi-Tenant
+
+```python
+async def test_tenant_isolation(client, admin_token):
+    # Create two tenants
+    await client.post("/api/tenants", json={"name": "A", "slug": "a"}, headers=...)
+    await client.post("/api/tenants", json={"name": "B", "slug": "b"}, headers=...)
+    
+    # Documents created under one tenant should not be visible to another
+```
+
+---
+
+## Adding New Webhook Events
+
+To add a new event type that triggers webhook delivery:
+
+### Step 1: Define the event
+
+Add the event string to the documented events list. Events follow the pattern `resource.action`:
+
+```
+document.created, document.approved, document.deleted
+lifecycle.expired, lifecycle.transitioned
+sla.at_risk, sla.breached
+approval.submitted, approval.decided
+```
+
+### Step 2: Emit the event from your service
+
+```python
+from app.services.webhooks import WebhookService
+
+webhook_service = WebhookService()
+
+# In your service method:
+await webhook_service.emit_event(
+    db=db,
+    event="my_resource.my_action",
+    data={"resource_id": 123, "details": "..."}
+)
+```
+
+### Step 3: The WebhookService handles delivery
+
+The service automatically:
+1. Queries active WebhookConfig records matching the event
+2. Builds the JSON payload with timestamp
+3. Signs with HMAC-SHA256 using the config's secret
+4. POSTs to the configured URL
+5. Includes `X-Webhook-Signature` header
+
+---
+
+## Creating Approval Chain Templates
+
+Approval chains can be pre-configured as templates tied to folders or document templates.
+
+### Template Structure
+
+```python
+# Create a chain programmatically for testing:
+chain = ApprovalChain(
+    name="Legal Review",
+    folder_id=legal_group_id,        # Auto-applied when docs uploaded to this folder
+    template_id=contract_template_id, # Or tied to a document template
+    is_active=True,
+)
+
+# Add sequential steps:
+step1 = ApprovalStep(
+    chain_id=chain.id,
+    step_order=1,
+    approval_type=ApprovalType.sequential,
+    role_code="reviewer",
+    timeout_hours=48,  # Auto-escalate after 48 hours
+)
+
+step2 = ApprovalStep(
+    chain_id=chain.id,
+    step_order=2,
+    approval_type=ApprovalType.parallel,  # All approvers must approve
+    role_code="approver",
+)
+```
+
+### Testing Approval Chains
+
+```bash
+uv run pytest tests/test_approval_chains.py -v
+```
+
+---
+
+## Writing Obsidian Plugin Extensions
+
+The Obsidian plugin specification lives in `docs/obsidian-plugin/` and follows TypeScript conventions.
+
+### Plugin Manifest
+
+The plugin defines:
+- `manifest.json`: Plugin metadata (id, name, version, minAppVersion)
+- `main.ts`: Entry point extending `Plugin` class
+- `settings.ts`: Plugin settings interface
+
+### Key Integration Points
+
+1. **Sync Command**: Triggers vault sync with EDMS server
+2. **Ribbon Action**: Quick-access button for sync
+3. **Settings Tab**: Configure EDMS server URL, API token, sync interval
+
+### Development Workflow
+
+```bash
+# The plugin spec is documentation-only; actual plugin development
+# happens in a separate Obsidian plugin repository.
+# The spec defines the API contract between EDMS and the plugin.
+```
+
+---
+
+## Canvas Format Specification
+
+The canvas export format is compatible with Obsidian's `.canvas` file format:
+
+### Node Types
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `file` | file, x, y, width, height, color | References a document |
+| `text` | text, x, y, width, height, color | Freeform text note |
+
+### Edge Format
+
+```json
+{
+  "id": "unique-edge-id",
+  "fromNode": "source-node-id",
+  "toNode": "target-node-id",
+  "fromSide": "bottom",
+  "toSide": "top",
+  "label": "optional edge label"
+}
+```
+
+### Coordinate System
+
+- Origin (0, 0) is at the center of the canvas
+- X increases to the right
+- Y increases downward
+- Width and height are in pixels
+
+---
+
 ## Security Monitoring Configuration
 
 ### Generating Tool Configurations

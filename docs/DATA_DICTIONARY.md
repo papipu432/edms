@@ -812,3 +812,493 @@ The Document model has been extended with:
 
 **New Relationships on Document:**
 - `versions` -> list[DocumentVersion] (one-to-many)
+
+---
+
+## Tag & Smart Folder Models
+
+### Tag
+
+**Table:** `tags`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(100) | UNIQUE, NOT NULL | Tag name |
+| `color` | String(7) | nullable | Hex color code (e.g., "#ff5733") |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+
+### DocumentTag
+
+**Table:** `document_tags`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `document_id` | Integer | FK -> documents.id, CASCADE, NOT NULL | Target document |
+| `tag_id` | Integer | FK -> tags.id, CASCADE, NOT NULL | Applied tag |
+| `created_at` | DateTime | NOT NULL, server_default=now() | When tag was applied |
+
+**Constraints:**
+- Unique constraint on (`document_id`, `tag_id`)
+
+### SmartFolder
+
+**Table:** `smart_folders`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(255) | NOT NULL | Smart folder display name |
+| `description` | Text | nullable | Description of the filter criteria |
+| `query_json` | JSON | nullable | Dynamic query filter definition |
+| `owner_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | Owner user |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | NOT NULL, server_default=now(), onupdate=now() | Last update |
+
+---
+
+## Document Template Model
+
+### DocumentTemplate
+
+**Table:** `document_templates`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(255) | NOT NULL | Template name |
+| `description` | Text | nullable | Template description |
+| `required_fields` | JSON | nullable | List of required metadata fields |
+| `default_folder_id` | Integer | FK -> groups.id, nullable | Default upload folder |
+| `default_lifecycle_type` | String(50) | nullable | Default lifecycle type to assign |
+| `extraction_prompt` | Text | nullable | LLM prompt for form extraction |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | NOT NULL, server_default=now(), onupdate=now() | Last update |
+
+---
+
+## Approval Chain Models
+
+### ApprovalChain
+
+**Table:** `approval_chains`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(255) | NOT NULL | Chain name |
+| `folder_id` | Integer | FK -> groups.id (SET NULL), nullable | Associated folder |
+| `template_id` | Integer | FK -> document_templates.id (SET NULL), nullable | Associated template |
+| `is_active` | Boolean | default=True | Active flag |
+| `created_at` | DateTime | server_default=now() | Creation timestamp |
+
+### ApprovalStep
+
+**Table:** `approval_steps`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `chain_id` | Integer | FK -> approval_chains.id, CASCADE, NOT NULL | Parent chain |
+| `step_order` | Integer | NOT NULL | Order within chain (1-based) |
+| `approval_type` | Enum(ApprovalType) | NOT NULL | sequential or parallel |
+| `role_code` | String(64) | nullable | Required role for approval |
+| `user_id` | String(36) | FK -> users.id (SET NULL), nullable | Specific user required |
+| `timeout_hours` | Integer | nullable | Hours before auto-escalation |
+| `created_at` | DateTime | server_default=now() | Creation timestamp |
+
+### ApprovalType Enum
+
+| Value | Description |
+|-------|-------------|
+| `sequential` | Steps processed one at a time in order |
+| `parallel` | All approvers at this step must approve |
+
+### ApprovalRequest
+
+**Table:** `approval_requests`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `document_id` | Integer | FK -> documents.id, CASCADE, NOT NULL | Document being approved |
+| `chain_id` | Integer | FK -> approval_chains.id, CASCADE, NOT NULL | Chain being executed |
+| `status` | Enum(ApprovalStatus) | default=pending, NOT NULL | Overall status |
+| `current_step_order` | Integer | default=1 | Current step being processed |
+| `submitted_by` | String(36) | FK -> users.id, CASCADE, NOT NULL | User who submitted |
+| `submitted_at` | DateTime | server_default=now() | Submission timestamp |
+| `completed_at` | DateTime | nullable | Completion timestamp |
+
+### ApprovalStatus Enum
+
+| Value | Description |
+|-------|-------------|
+| `pending` | Awaiting decisions |
+| `approved` | All steps passed |
+| `rejected` | A step was rejected |
+
+### ApprovalDecision
+
+**Table:** `approval_decisions`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `request_id` | Integer | FK -> approval_requests.id, CASCADE, NOT NULL | Parent request |
+| `step_id` | Integer | FK -> approval_steps.id, CASCADE, NOT NULL | Step being decided |
+| `user_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | User who decided |
+| `decision` | Enum(ApprovalDecisionValue) | NOT NULL | approved or rejected |
+| `comment` | Text | nullable | Decision comment |
+| `decided_at` | DateTime | server_default=now() | Decision timestamp |
+
+---
+
+## Comment Model
+
+### Comment
+
+**Table:** `comments`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `document_id` | Integer | FK -> documents.id, CASCADE, NOT NULL | Target document |
+| `user_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | Comment author |
+| `content` | Text | NOT NULL | Comment text (supports @mentions) |
+| `parent_id` | Integer | FK -> comments.id, CASCADE, nullable | Parent comment for threading |
+| `created_at` | DateTime | server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | nullable | Last edit timestamp |
+
+---
+
+## Document Lock Model
+
+### DocumentLock
+
+**Table:** `document_locks`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `document_id` | Integer | FK -> documents.id, CASCADE, UNIQUE, NOT NULL | Locked document |
+| `user_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | User who holds lock |
+| `locked_at` | DateTime | server_default=now() | When lock was acquired |
+| `expires_at` | DateTime | NOT NULL | Lock expiration time |
+| `reason` | Text | nullable | Reason for locking |
+
+---
+
+## Document Signature Model
+
+### DocumentSignature
+
+**Table:** `document_signatures`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `document_id` | Integer | FK -> documents.id, CASCADE, NOT NULL | Signed document |
+| `signer_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | User who signed |
+| `signature_hash` | String(64) | UNIQUE, indexed, NOT NULL | SHA-256 hash of document content |
+| `qr_code_path` | String(1000) | nullable | Path to generated QR code image |
+| `signed_at` | DateTime | server_default=now() | Signing timestamp |
+| `certificate_data` | Text | nullable | X.509 certificate PEM data |
+| `verification_url` | String(500) | nullable | URL for external verification |
+| `is_valid` | Boolean | default=True | Signature validity flag |
+
+---
+
+## Delegation Model
+
+### Delegation
+
+**Table:** `delegations`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `delegator_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | User delegating authority |
+| `delegate_id` | String(36) | FK -> users.id, CASCADE, NOT NULL | User receiving authority |
+| `start_date` | DateTime | NOT NULL | Delegation start time |
+| `end_date` | DateTime | NOT NULL | Delegation end time |
+| `scope_type` | Enum(DelegationScopeType) | default=all, NOT NULL | all or folder |
+| `scope_folder_id` | Integer | FK -> groups.id (SET NULL), nullable | Folder scope (if folder type) |
+| `is_active` | Boolean | default=True | Active flag |
+| `created_at` | DateTime | server_default=now() | Creation timestamp |
+
+### DelegationScopeType Enum
+
+| Value | Description |
+|-------|-------------|
+| `all` | Delegation covers all folders/documents |
+| `folder` | Delegation limited to specific folder |
+
+---
+
+## SLA Models
+
+### SLAPolicy
+
+**Table:** `sla_policies`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `folder_id` | Integer | FK -> groups.id (SET NULL), nullable | Folder this policy applies to |
+| `template_id` | Integer | FK -> document_templates.id (SET NULL), nullable | Template this policy applies to |
+| `action` | String(64) | default="approval", NOT NULL | Action being tracked (e.g., approval) |
+| `max_duration_hours` | Integer | NOT NULL | Maximum allowed hours |
+| `escalation_role` | String(64) | nullable | Role to notify on breach |
+| `is_active` | Boolean | default=True | Policy active flag |
+| `created_at` | DateTime | server_default=now() | Creation timestamp |
+
+### DocumentSLA
+
+**Table:** `document_slas`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `document_id` | Integer | FK -> documents.id, CASCADE, NOT NULL | Tracked document |
+| `policy_id` | Integer | FK -> sla_policies.id, CASCADE, NOT NULL | Governing policy |
+| `started_at` | DateTime | NOT NULL | When SLA clock started |
+| `deadline_at` | DateTime | NOT NULL | SLA deadline |
+| `status` | Enum(SLAStatus) | default=on_time, NOT NULL | Current SLA status |
+| `completed_at` | DateTime | nullable | When action was completed |
+| `escalated` | Boolean | default=False | Whether escalation was triggered |
+
+### SLAStatus Enum
+
+| Value | Description |
+|-------|-------------|
+| `on_time` | Within acceptable time range |
+| `at_risk` | Approaching deadline (< 25% remaining) |
+| `breached` | Past deadline |
+| `completed` | Action completed within deadline |
+
+---
+
+## Geo-Fence Model
+
+### GeoFenceRule
+
+**Table:** `geofence_rules`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `scope` | String(32) | NOT NULL, default="global" | Rule scope: global, group, document |
+| `scope_id` | Integer | nullable | ID of scoped resource |
+| `allowed_ip_ranges` | JSON | nullable | List of allowed CIDR ranges |
+| `denied_ip_ranges` | JSON | nullable | List of blocked CIDR ranges |
+| `allowed_countries` | JSON | nullable | List of allowed ISO country codes |
+| `denied_countries` | JSON | nullable | List of blocked ISO country codes |
+| `action` | String(16) | NOT NULL, default="allow" | Default action: allow or deny |
+| `enabled` | Boolean | default=True, NOT NULL | Rule enabled flag |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | NOT NULL, server_default=now(), onupdate=now() | Last update |
+
+---
+
+## Watermark Model
+
+### WatermarkConfig
+
+**Table:** `watermark_configs`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `group_id` | Integer | FK -> groups.id, nullable | Group this config applies to (null=global) |
+| `text_template` | String(500) | NOT NULL, default pattern | Template with {user}, {timestamp}, {doc_id} |
+| `opacity` | Float | default=0.3, NOT NULL | Watermark opacity (0.0-1.0) |
+| `position` | String(32) | default="diagonal", NOT NULL | Position: diagonal, center, footer |
+| `enabled` | Boolean | default=True, NOT NULL | Config enabled flag |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+
+---
+
+## Access Request Model
+
+### AccessRequest
+
+**Table:** `access_requests`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `requester_id` | String(36) | FK -> users.id, NOT NULL | User requesting access |
+| `resource_type` | String(32) | NOT NULL | Type: "document" or "group" |
+| `resource_id` | Integer | NOT NULL | ID of the resource |
+| `reason` | Text | nullable | Reason for request |
+| `status` | String(16) | NOT NULL, default="pending" | pending, approved, denied |
+| `reviewed_by` | String(36) | FK -> users.id, nullable | Admin who reviewed |
+| `reviewed_at` | DateTime | nullable | Review timestamp |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | NOT NULL, server_default=now(), onupdate=now() | Last update |
+
+---
+
+## Session Recording Models
+
+### UserSession
+
+**Table:** `user_sessions`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | String(36) | PK, UUID default | UUID primary key |
+| `user_id` | String(36) | FK -> users.id, NOT NULL | Session owner |
+| `started_at` | DateTime | NOT NULL, server_default=now() | Session start |
+| `ended_at` | DateTime | nullable | Session end |
+| `ip_address` | String(45) | nullable | Client IP address |
+| `user_agent` | String(512) | nullable | Browser user agent |
+
+**Relationships:**
+- `documents` -> list[SessionDocument] (one-to-many, selectin loading)
+
+### SessionDocument
+
+**Table:** `session_documents`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `session_id` | String(36) | FK -> user_sessions.id, NOT NULL | Parent session |
+| `document_id` | Integer | FK -> documents.id, NOT NULL | Accessed document |
+| `action` | String(16) | NOT NULL | Action: view, download, edit |
+| `accessed_at` | DateTime | NOT NULL, server_default=now() | Access timestamp |
+
+**Relationships:**
+- `session` -> UserSession (many-to-one)
+
+---
+
+## Canvas Models
+
+### Canvas
+
+**Table:** `canvases`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(255) | NOT NULL | Canvas name |
+| `owner_id` | String | FK -> users.id, CASCADE, NOT NULL | Canvas owner |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+
+**Relationships:**
+- `items` -> list[CanvasItem] (one-to-many, cascade delete)
+- `connections` -> list[CanvasConnection] (one-to-many, cascade delete)
+
+### CanvasItem
+
+**Table:** `canvas_items`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `canvas_id` | Integer | FK -> canvases.id, CASCADE, NOT NULL | Parent canvas |
+| `document_id` | Integer | FK -> documents.id, nullable | Linked document (optional) |
+| `note_text` | Text | nullable | Text content for note items |
+| `x_position` | Float | NOT NULL, default=0.0 | X coordinate |
+| `y_position` | Float | NOT NULL, default=0.0 | Y coordinate |
+| `width` | Float | NOT NULL, default=200.0 | Item width |
+| `height` | Float | NOT NULL, default=100.0 | Item height |
+| `color` | String(50) | nullable | Optional color (hex) |
+
+**Relationships:**
+- `canvas` -> Canvas (many-to-one)
+
+### CanvasConnection
+
+**Table:** `canvas_connections`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `canvas_id` | Integer | FK -> canvases.id, CASCADE, NOT NULL | Parent canvas |
+| `from_item_id` | Integer | FK -> canvas_items.id, CASCADE, NOT NULL | Source item |
+| `to_item_id` | Integer | FK -> canvas_items.id, CASCADE, NOT NULL | Target item |
+| `label` | String(255) | nullable | Edge label |
+
+**Relationships:**
+- `canvas` -> Canvas (many-to-one)
+
+---
+
+## Tenant Model
+
+### Tenant
+
+**Table:** `tenants`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(255) | NOT NULL | Tenant display name |
+| `slug` | String(100) | UNIQUE, NOT NULL | URL-safe tenant identifier |
+| `settings` | JSON | nullable | Per-tenant configuration |
+| `is_active` | Boolean | default=True | Tenant active flag |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+
+---
+
+## Scheduled Report Model
+
+### ScheduledReport
+
+**Table:** `scheduled_reports`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `name` | String(255) | NOT NULL | Report name |
+| `schedule` | String(100) | NOT NULL | Cron expression for scheduling |
+| `report_type` | String(64) | NOT NULL | Type of report to generate |
+| `recipients` | JSON | NOT NULL | List of email addresses |
+| `filters` | JSON | nullable | Optional filter criteria |
+| `is_active` | Boolean | default=True | Schedule active flag |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | server_default=now(), onupdate=now(), nullable | Last update |
+
+---
+
+## Health Score Model
+
+### HealthScoreRecord
+
+**Table:** `health_score_records`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `date` | Date | NOT NULL | Score date |
+| `composite_score` | Float | NOT NULL | Overall 0-100 score |
+| `orphan_score` | Float | NOT NULL | Orphan document component |
+| `lifecycle_score` | Float | NOT NULL | Lifecycle health component |
+| `backup_score` | Float | NOT NULL | Backup recency component |
+| `security_score` | Float | NOT NULL | Security posture component |
+| `storage_score` | Float | NOT NULL | Storage utilization component |
+| `sla_score` | Float | NOT NULL | SLA compliance component |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Record timestamp |
+
+---
+
+## Webhook Model
+
+### WebhookConfig
+
+**Table:** `webhook_configs`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | Integer | PK, indexed | Auto-increment primary key |
+| `url` | String(1000) | NOT NULL | Destination URL |
+| `secret` | String(256) | NOT NULL | HMAC signing secret |
+| `events` | JSON | NOT NULL | List of event types to subscribe |
+| `is_active` | Boolean | default=True | Webhook enabled flag |
+| `headers` | JSON | nullable | Custom headers to include |
+| `created_at` | DateTime | NOT NULL, server_default=now() | Creation timestamp |
+| `updated_at` | DateTime | server_default=now(), onupdate=now(), nullable | Last update |

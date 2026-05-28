@@ -630,3 +630,219 @@ Set up a cron job to run health checks and send digest emails:
 | broken_reviewer | High | Reassign reviewer |
 | empty_group | Low | Remove group or add documents |
 | stale_document | Medium | Retry processing or mark as failed |
+
+---
+
+## Multi-Tenant Operations
+
+### Tenant Provisioning
+
+Create and manage tenants through the API:
+
+```bash
+# Create a new tenant
+curl -X POST http://localhost:8000/api/tenants \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "New Client", "slug": "new-client", "settings": {"max_storage_gb": 50}}'
+
+# List all tenants
+curl http://localhost:8000/api/tenants -H "Authorization: Bearer $TOKEN"
+
+# Deactivate a tenant
+curl -X PUT http://localhost:8000/api/tenants/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+### Tenant Isolation Verification
+
+Periodically verify tenant isolation is functioning:
+1. Attempt cross-tenant data access (should return empty results)
+2. Verify storage directories are separated per tenant
+3. Check that tenant-scoped queries do not leak data
+
+### Tenant Storage Management
+
+Monitor per-tenant storage usage and enforce quotas defined in tenant settings:
+```bash
+# Check storage for each tenant directory
+du -sh /data/edms/storage/tenant-*/
+```
+
+---
+
+## Webhook Monitoring
+
+### Monitoring Webhook Delivery
+
+Track webhook delivery status and failures:
+
+```bash
+# List configured webhooks
+curl http://localhost:8000/api/webhooks -H "Authorization: Bearer $TOKEN"
+
+# Test a webhook endpoint
+curl -X POST http://localhost:8000/api/webhooks/1/test -H "Authorization: Bearer $TOKEN"
+```
+
+### Common Webhook Issues
+
+| Issue | Symptom | Resolution |
+|-------|---------|------------|
+| Endpoint unreachable | Delivery timeouts | Check destination URL, firewall rules |
+| Invalid signature | 401/403 from receiver | Verify secret matches on both sides |
+| Payload too large | 413 from receiver | Reduce event data or paginate |
+| Rate limiting by receiver | 429 responses | Implement exponential backoff |
+
+### Webhook Secret Rotation
+
+To rotate a webhook secret without downtime:
+1. Update the webhook config with a new secret
+2. Configure the receiver to accept both old and new signatures temporarily
+3. Once all pending deliveries with old secret are processed, remove old secret from receiver
+
+```bash
+curl -X PUT http://localhost:8000/api/webhooks/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"secret": "new-rotated-secret-value"}'
+```
+
+---
+
+## SLA Breach Escalation
+
+### Monitoring SLA Status
+
+Regularly check SLA compliance across the system:
+
+```bash
+# Check SLA dashboard
+curl http://localhost:8000/api/sla/dashboard -H "Authorization: Bearer $TOKEN"
+```
+
+### Automated SLA Monitoring
+
+Set up a cron job to check SLA status and trigger escalations:
+
+```bash
+# Every 15 minutes, check for SLA breaches
+*/15 * * * * curl -X POST http://localhost:8000/api/sla/check \
+  -H "Authorization: Bearer $SERVICE_TOKEN" 2>/dev/null
+```
+
+### Escalation Procedure
+
+When an SLA is breached:
+1. The system sets `status = breached` and `escalated = true`
+2. Notifications are sent to users with the `escalation_role`
+3. A webhook event `sla.breached` is emitted (if webhooks configured)
+4. The SLA dashboard reflects the breach with high visibility
+
+### Resolving SLA Issues
+
+- For false positives: Review and adjust `max_duration_hours` on the policy
+- For systemic delays: Add more approvers or reduce required approval steps
+- For recurring breaches: Consider splitting the workflow or delegating authority
+
+---
+
+## Geo-Fence Rule Management
+
+### Reviewing Active Rules
+
+```bash
+curl http://localhost:8000/api/geofence/rules -H "Authorization: Bearer $TOKEN"
+```
+
+### Emergency Rule Disablement
+
+If geo-fencing is blocking legitimate users:
+
+```bash
+# Disable a specific rule
+curl -X PUT http://localhost:8000/api/geofence/rules/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": false}'
+```
+
+### Audit Geo-Fence Denials
+
+Check application logs for geo-fence block events. The middleware logs:
+- Client IP that was blocked
+- Which rule triggered the block
+- The requested resource
+
+### Best Practices
+
+1. Always test rules with a non-critical scope before applying globally
+2. Maintain a list of known office IP ranges
+3. Use `allowed_countries` rather than `denied_countries` for sensitive resources
+4. Keep a "break glass" admin account that bypasses geo-fencing
+
+---
+
+## Health Score Thresholds
+
+### Understanding the Health Score
+
+The composite health score (0-100) is computed from six components:
+
+| Component | Weight | What it measures |
+|-----------|--------|-----------------|
+| orphan | 0.15 | Documents without valid relationships or groups |
+| lifecycle | 0.20 | Expired/stuck lifecycle states |
+| backup | 0.20 | Backup recency and success rate |
+| security | 0.20 | Security alert count, unacknowledged alerts |
+| storage | 0.15 | Disk utilization, failed processing ratio |
+| sla | 0.10 | SLA compliance percentage |
+
+### Alert Thresholds
+
+| Score Range | Status | Action |
+|-------------|--------|--------|
+| 90-100 | Healthy | No action needed |
+| 70-89 | Warning | Review components below 80 |
+| 50-69 | Degraded | Investigate and remediate |
+| 0-49 | Critical | Immediate intervention required |
+
+### Viewing History
+
+```bash
+curl "http://localhost:8000/api/health/score/history?days=30" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Track trends to identify gradual degradation before it becomes critical.
+
+---
+
+## Scheduled Report Troubleshooting
+
+### Report Not Generating
+
+1. Verify the report is active:
+   ```bash
+   curl http://localhost:8000/api/reports -H "Authorization: Bearer $TOKEN"
+   ```
+2. Check the cron schedule is valid (use crontab.guru to validate)
+3. Verify SMTP is configured (reports are delivered via email)
+4. Check that recipient email addresses are valid
+
+### Report Content Issues
+
+- Empty reports: Verify the filter criteria match actual data
+- Stale data: Ensure the cron schedule fires at the expected time
+- Missing recipients: Check the `recipients` JSON array for valid addresses
+
+### Manual Trigger for Testing
+
+```bash
+curl -X POST http://localhost:8000/api/reports/1/trigger \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+This immediately generates and sends the report, useful for testing configuration.

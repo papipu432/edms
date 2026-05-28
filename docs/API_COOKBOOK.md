@@ -1763,6 +1763,1055 @@ Navigate to `/settings/health` in the browser (requires admin role).
 
 ---
 
+## Approval Chains
+
+### Create an approval chain
+
+```bash
+curl -X POST http://localhost:8000/api/approval-chains \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Engineering Review",
+    "folder_id": 1,
+    "steps": [
+      {"step_order": 1, "approval_type": "sequential", "role_code": "reviewer"},
+      {"step_order": 2, "approval_type": "parallel", "role_code": "approver"}
+    ]
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Engineering Review",
+  "folder_id": 1,
+  "template_id": null,
+  "is_active": true,
+  "steps": [
+    {"id": 1, "step_order": 1, "approval_type": "sequential", "role_code": "reviewer", "user_id": null, "timeout_hours": null},
+    {"id": 2, "step_order": 2, "approval_type": "parallel", "role_code": "approver", "user_id": null, "timeout_hours": null}
+  ],
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List approval chains
+
+```bash
+curl http://localhost:8000/api/approval-chains \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Submit document for approval chain
+
+```bash
+curl -X POST http://localhost:8000/api/approval-chains/1/submit \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"document_id": 5}'
+```
+
+### Make approval decision
+
+```bash
+curl -X POST http://localhost:8000/api/approval-chains/requests/1/decide \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"decision": "approved", "comment": "Looks good to proceed"}'
+```
+
+---
+
+## Comments & Discussions
+
+### Create a comment on a document
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/comments \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "This section needs revision. @jane can you review?"}'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "document_id": 1,
+  "user_id": "user-uuid",
+  "content": "This section needs revision. @jane can you review?",
+  "parent_id": null,
+  "created_at": "2024-01-15T10:30:00",
+  "updated_at": null
+}
+```
+
+### Reply to a comment (thread)
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/comments \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "I will take a look at this today.", "parent_id": 1}'
+```
+
+### List comments for a document
+
+```bash
+curl http://localhost:8000/api/documents/1/comments \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Update a comment
+
+```bash
+curl -X PUT http://localhost:8000/api/comments/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Updated: this section has been revised."}'
+```
+
+### Delete a comment
+
+```bash
+curl -X DELETE http://localhost:8000/api/comments/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Document Locks (Checkout)
+
+### Lock a document
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/lock \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"duration_minutes": 60, "reason": "Editing compliance section"}'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "document_id": 1,
+  "user_id": "user-uuid",
+  "locked_at": "2024-01-15T10:30:00",
+  "expires_at": "2024-01-15T11:30:00",
+  "reason": "Editing compliance section"
+}
+```
+
+### Check lock status
+
+```bash
+curl http://localhost:8000/api/documents/1/lock \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Unlock a document
+
+```bash
+curl -X DELETE http://localhost:8000/api/documents/1/lock \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## E-Signatures
+
+### Sign a document
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/sign \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Final approval signature"}'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "document_id": 1,
+  "signer_id": "user-uuid",
+  "signature_hash": "a1b2c3d4e5f6...64-char-sha256-hex",
+  "qr_code_path": "signatures/qr_a1b2c3d4.png",
+  "signed_at": "2024-01-15T10:30:00",
+  "is_valid": true,
+  "verification_url": "http://localhost:8000/api/signatures/verify/a1b2c3d4e5f6..."
+}
+```
+
+### Sign with X.509 certificate
+
+```bash
+curl -X POST http://localhost:8000/api/documents/1/sign \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Certified approval",
+    "private_key_pem": "-----BEGIN PRIVATE KEY-----\n..."
+  }'
+```
+
+### Verify a signature
+
+```bash
+curl http://localhost:8000/api/signatures/verify/a1b2c3d4e5f6... \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### List document signatures
+
+```bash
+curl http://localhost:8000/api/documents/1/signatures \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Delegations
+
+### Create a delegation
+
+```bash
+curl -X POST http://localhost:8000/api/delegations \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "delegate_id": "USER_UUID_OF_DELEGATE",
+    "start_date": "2024-01-15T00:00:00",
+    "end_date": "2024-01-22T23:59:59",
+    "scope_type": "folder",
+    "scope_folder_id": 1
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "delegator_id": "user-uuid",
+  "delegate_id": "delegate-uuid",
+  "start_date": "2024-01-15T00:00:00",
+  "end_date": "2024-01-22T23:59:59",
+  "scope_type": "folder",
+  "scope_folder_id": 1,
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List active delegations
+
+```bash
+curl http://localhost:8000/api/delegations \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Revoke a delegation
+
+```bash
+curl -X DELETE http://localhost:8000/api/delegations/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## SLA Tracking
+
+### Create an SLA policy
+
+```bash
+curl -X POST http://localhost:8000/api/sla-policies \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "folder_id": 1,
+    "action": "approval",
+    "max_duration_hours": 48,
+    "escalation_role": "manager"
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "folder_id": 1,
+  "template_id": null,
+  "action": "approval",
+  "max_duration_hours": 48,
+  "escalation_role": "manager",
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### Get SLA dashboard
+
+```bash
+curl http://localhost:8000/api/sla/dashboard \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "total": 15,
+  "on_time": 10,
+  "at_risk": 3,
+  "breached": 2,
+  "items": [
+    {
+      "id": 1,
+      "document_id": 5,
+      "policy_id": 1,
+      "started_at": "2024-01-13T10:00:00",
+      "deadline_at": "2024-01-15T10:00:00",
+      "status": "at_risk",
+      "escalated": false
+    }
+  ]
+}
+```
+
+### List SLA policies
+
+```bash
+curl http://localhost:8000/api/sla-policies \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Natural Language Search
+
+### Query with natural language
+
+```bash
+curl -X POST http://localhost:8000/api/search/natural \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "documents approved last week in the engineering folder"}'
+```
+
+**Response:**
+```json
+{
+  "interpreted_filters": {
+    "status": "processed",
+    "workflow_action": "approve",
+    "date_range": "last 7 days",
+    "group_name": "engineering"
+  },
+  "results": [
+    {"id": 5, "original_filename": "spec-v2.pdf", "group_id": 1, "status": "processed"}
+  ],
+  "total": 1
+}
+```
+
+---
+
+## Knowledge Graph
+
+### Get knowledge graph data
+
+```bash
+curl "http://localhost:8000/api/knowledge-graph?limit=500" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "nodes": [
+    {"id": "doc_1", "label": "policy.pdf", "type": "document", "group": "Engineering"},
+    {"id": "entity_openai", "label": "OpenAI", "type": "entity"}
+  ],
+  "edges": [
+    {"from": "doc_1", "to": "entity_openai", "label": "mentions", "type": "mention"}
+  ]
+}
+```
+
+### Filter by document or group
+
+```bash
+curl "http://localhost:8000/api/knowledge-graph?document_id=1" \
+  -H "Authorization: Bearer $TOKEN"
+
+curl "http://localhost:8000/api/knowledge-graph?group_id=3" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Get knowledge graph HTML visualization
+
+```bash
+curl "http://localhost:8000/api/knowledge-graph/view" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Returns a full HTML page with vis.js interactive graph.
+
+---
+
+## Comparative Analysis
+
+### Compare multiple documents
+
+```bash
+curl -X POST http://localhost:8000/api/compare/analyze \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"document_ids": [1, 2, 3]}'
+```
+
+**Response:**
+```json
+{
+  "documents": [
+    {"id": 1, "filename": "policy-v1.pdf"},
+    {"id": 2, "filename": "policy-v2.pdf"},
+    {"id": 3, "filename": "policy-v3.pdf"}
+  ],
+  "analysis": "The three documents show progressive evolution of the policy...",
+  "key_differences": [
+    "Document 2 adds a compliance section not present in v1",
+    "Document 3 removes the legacy procedures from section 4"
+  ],
+  "common_themes": ["Access control", "Data retention", "Incident response"]
+}
+```
+
+---
+
+## Compliance Reporting
+
+### Generate a compliance report
+
+```bash
+curl -X POST http://localhost:8000/api/compliance/reports \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"report_type": "access_log", "start_date": "2024-01-01", "end_date": "2024-01-31"}'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "report_type": "access_log",
+  "status": "completed",
+  "generated_at": "2024-01-15T10:30:00",
+  "summary": {"total_accesses": 1250, "unique_users": 45, "documents_accessed": 230}
+}
+```
+
+### List compliance reports
+
+```bash
+curl http://localhost:8000/api/compliance/reports \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Export compliance report as CSV
+
+```bash
+curl http://localhost:8000/api/compliance/reports/1/csv \
+  -H "Authorization: Bearer $TOKEN" \
+  -o report.csv
+```
+
+Available report types: `access_log`, `encryption_status`, `retention_compliance`, `permission_audit`
+
+---
+
+## Geo-Fence Rules
+
+### Create a geo-fence rule
+
+```bash
+curl -X POST http://localhost:8000/api/geofence/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "global",
+    "allowed_countries": ["US", "GB", "DE"],
+    "denied_ip_ranges": ["10.0.0.0/8"],
+    "action": "allow",
+    "enabled": true
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "scope": "global",
+  "scope_id": null,
+  "allowed_ip_ranges": null,
+  "denied_ip_ranges": ["10.0.0.0/8"],
+  "allowed_countries": ["US", "GB", "DE"],
+  "denied_countries": null,
+  "action": "allow",
+  "enabled": true,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List geo-fence rules
+
+```bash
+curl http://localhost:8000/api/geofence/rules \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Update a rule
+
+```bash
+curl -X PUT http://localhost:8000/api/geofence/rules/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"allowed_countries": ["US", "GB", "DE", "FR"]}'
+```
+
+### Delete a rule
+
+```bash
+curl -X DELETE http://localhost:8000/api/geofence/rules/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Watermark Configuration
+
+### Create watermark config
+
+```bash
+curl -X POST http://localhost:8000/api/watermark/configs \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "group_id": 1,
+    "text_template": "{user} - {timestamp} - CONFIDENTIAL",
+    "opacity": 0.3,
+    "position": "diagonal",
+    "enabled": true
+  }'
+```
+
+### List watermark configs
+
+```bash
+curl http://localhost:8000/api/watermark/configs \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Apply watermark to document
+
+```bash
+curl "http://localhost:8000/api/watermark/apply/1" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o watermarked_document.pdf
+```
+
+---
+
+## Access Requests
+
+### Request access to a resource
+
+```bash
+curl -X POST http://localhost:8000/api/request-access \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resource_type": "document",
+    "resource_id": 5,
+    "reason": "Need to review for quarterly audit"
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "requester_id": "user-uuid",
+  "resource_type": "document",
+  "resource_id": 5,
+  "reason": "Need to review for quarterly audit",
+  "status": "pending",
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List pending access requests (admin)
+
+```bash
+curl http://localhost:8000/api/access-requests \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Approve/deny an access request
+
+```bash
+curl -X PUT http://localhost:8000/api/access-requests/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "approved"}'
+```
+
+---
+
+## Session Recording
+
+### List user sessions
+
+```bash
+curl "http://localhost:8000/api/sessions?limit=50" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": "session-uuid",
+      "user_id": "user-uuid",
+      "started_at": "2024-01-15T09:00:00",
+      "ended_at": "2024-01-15T17:00:00",
+      "ip_address": "192.168.1.100",
+      "documents": [
+        {"document_id": 1, "action": "view", "accessed_at": "2024-01-15T09:05:00"},
+        {"document_id": 3, "action": "download", "accessed_at": "2024-01-15T09:10:00"}
+      ]
+    }
+  ],
+  "total": 1
+}
+```
+
+### Get session details
+
+```bash
+curl http://localhost:8000/api/sessions/SESSION_UUID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Obsidian Sync (Bi-directional)
+
+### Import Obsidian vault
+
+```bash
+curl -X POST http://localhost:8000/api/wiki/sync/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@my-obsidian-vault.zip"
+```
+
+**Response:**
+```json
+{
+  "imported": 15,
+  "updated": 3,
+  "skipped": 2,
+  "conflicts_resolved": 1,
+  "details": "Imported 15 new pages, updated 3 existing. Conflicts resolved using EDMS-wins for summaries/."
+}
+```
+
+---
+
+## Daily Notes
+
+### Generate today's daily note
+
+```bash
+curl -X POST http://localhost:8000/api/wiki/daily-note \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "date": "2024-01-15",
+  "content": "# Daily Note - 2024-01-15\n\n## Documents Processed\n- policy.pdf (approved)...",
+  "path": "daily-notes/2024-01-15.md"
+}
+```
+
+### List daily notes
+
+```bash
+curl http://localhost:8000/api/wiki/daily-notes \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Canvas/Whiteboard
+
+### Create a canvas
+
+```bash
+curl -X POST http://localhost:8000/api/canvas \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Architecture Overview"}'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Architecture Overview",
+  "owner_id": "user-uuid",
+  "created_at": "2024-01-15T10:30:00",
+  "items": [],
+  "connections": []
+}
+```
+
+### Add items to canvas
+
+```bash
+curl -X POST http://localhost:8000/api/canvas/1/items \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_id": 5,
+    "x_position": 100.0,
+    "y_position": 200.0,
+    "width": 250.0,
+    "height": 150.0,
+    "color": "#3b82f6"
+  }'
+```
+
+### Add a connection between items
+
+```bash
+curl -X POST http://localhost:8000/api/canvas/1/connections \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"from_item_id": 1, "to_item_id": 2, "label": "depends on"}'
+```
+
+### Export canvas as .canvas format
+
+```bash
+curl http://localhost:8000/api/canvas/1/export \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "nodes": [
+    {"id": "item-1", "type": "file", "file": "doc-5.pdf", "x": 100, "y": 200, "width": 250, "height": 150, "color": "#3b82f6"}
+  ],
+  "edges": [
+    {"id": "conn-1", "fromNode": "item-1", "toNode": "item-2", "label": "depends on"}
+  ]
+}
+```
+
+### List canvases
+
+```bash
+curl http://localhost:8000/api/canvas \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Health Score
+
+### Get composite health score
+
+```bash
+curl http://localhost:8000/api/health/score \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "composite_score": 85,
+  "components": [
+    {"name": "orphan", "score": 95, "weight": 0.15},
+    {"name": "lifecycle", "score": 80, "weight": 0.2},
+    {"name": "backup", "score": 90, "weight": 0.2},
+    {"name": "security", "score": 85, "weight": 0.2},
+    {"name": "storage", "score": 75, "weight": 0.15},
+    {"name": "sla", "score": 88, "weight": 0.1}
+  ],
+  "computed_at": "2024-01-15T10:30:00"
+}
+```
+
+### Get health score history
+
+```bash
+curl "http://localhost:8000/api/health/score/history?days=30" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Scheduled Reports
+
+### Create a scheduled report
+
+```bash
+curl -X POST http://localhost:8000/api/reports \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Weekly Document Summary",
+    "schedule": "0 8 * * MON",
+    "report_type": "document_summary",
+    "recipients": ["admin@company.com", "manager@company.com"],
+    "filters": {"group_id": 1},
+    "is_active": true
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Weekly Document Summary",
+  "schedule": "0 8 * * MON",
+  "report_type": "document_summary",
+  "recipients": ["admin@company.com", "manager@company.com"],
+  "filters": {"group_id": 1},
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List scheduled reports
+
+```bash
+curl http://localhost:8000/api/reports \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Trigger a report manually
+
+```bash
+curl -X POST http://localhost:8000/api/reports/1/trigger \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Update a scheduled report
+
+```bash
+curl -X PUT http://localhost:8000/api/reports/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"schedule": "0 8 * * MON,THU", "is_active": true}'
+```
+
+### Delete a scheduled report
+
+```bash
+curl -X DELETE http://localhost:8000/api/reports/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Multi-Tenant
+
+### Create a tenant
+
+```bash
+curl -X POST http://localhost:8000/api/tenants \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corporation",
+    "slug": "acme",
+    "settings": {"max_storage_gb": 100, "max_users": 50}
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Acme Corporation",
+  "slug": "acme",
+  "settings": {"max_storage_gb": 100, "max_users": 50},
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List tenants
+
+```bash
+curl http://localhost:8000/api/tenants \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Update a tenant
+
+```bash
+curl -X PUT http://localhost:8000/api/tenants/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"settings": {"max_storage_gb": 200, "max_users": 100}}'
+```
+
+### Delete a tenant
+
+```bash
+curl -X DELETE http://localhost:8000/api/tenants/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Offline Packages
+
+### Generate offline package
+
+```bash
+curl -X POST http://localhost:8000/api/offline/generate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"document_ids": [1, 2, 3]}' \
+  -o offline-package.zip
+```
+
+The ZIP contains a self-contained HTML viewer with all document content viewable without a server.
+
+### Generate by group
+
+```bash
+curl -X POST http://localhost:8000/api/offline/generate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"group_id": 1}' \
+  -o offline-group-package.zip
+```
+
+---
+
+## Import/Export
+
+### Import from ZIP
+
+```bash
+curl -X POST http://localhost:8000/api/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@documents.zip"
+```
+
+The ZIP should contain a `manifest.json` with document metadata and the document files.
+
+**Response:**
+```json
+{
+  "imported": 10,
+  "skipped": 2,
+  "errors": []
+}
+```
+
+### Import from CSV
+
+```bash
+curl -X POST http://localhost:8000/api/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@metadata.csv"
+```
+
+### Export all documents
+
+```bash
+curl http://localhost:8000/api/export \
+  -H "Authorization: Bearer $TOKEN" \
+  -o full-export.zip
+```
+
+---
+
+## Webhooks
+
+### Create a webhook
+
+```bash
+curl -X POST http://localhost:8000/api/webhooks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://hooks.company.com/edms",
+    "secret": "my-webhook-secret-key",
+    "events": ["document.created", "document.approved", "lifecycle.expired"],
+    "is_active": true
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "url": "https://hooks.company.com/edms",
+  "events": ["document.created", "document.approved", "lifecycle.expired"],
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### List webhooks
+
+```bash
+curl http://localhost:8000/api/webhooks \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Test a webhook
+
+```bash
+curl -X POST http://localhost:8000/api/webhooks/1/test \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Update a webhook
+
+```bash
+curl -X PUT http://localhost:8000/api/webhooks/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"events": ["document.created", "document.approved", "lifecycle.expired", "sla.breached"]}'
+```
+
+### Delete a webhook
+
+```bash
+curl -X DELETE http://localhost:8000/api/webhooks/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Webhook payloads are signed with HMAC-SHA256 using your configured secret. Verify the `X-Webhook-Signature` header.
+
+---
+
 ## Tips
 
 - All authenticated endpoints require `Authorization: Bearer <token>` header

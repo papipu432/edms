@@ -668,3 +668,311 @@ Common issues with symptoms, causes, and solutions.
    curl "http://localhost:8000/api/chat/sessions/SESSION_ID/export?format=markdown" \
      -H "Authorization: Bearer $TOKEN"
    ```
+
+---
+
+## Approval Chain Stuck
+
+**Symptoms:**
+- Approval request stays in "pending" status indefinitely
+- No decisions being recorded even though approvers are available
+- Document cannot proceed through workflow
+
+**Causes:**
+- No users with the required role_code for the current step
+- The designated user_id in the step is deactivated
+- Delegation exists but scope does not match
+- Timeout not configured (no auto-escalation)
+
+**Solutions:**
+1. Check the current step requirements:
+   ```bash
+   curl http://localhost:8000/api/approval-chains/CHAIN_ID \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+2. Verify users with the required role exist and are active:
+   ```bash
+   curl http://localhost:8000/api/users \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+3. Check if a delegation covers the stuck approval:
+   ```bash
+   curl http://localhost:8000/api/delegations \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+4. If blocked permanently, an admin can make the decision directly:
+   ```bash
+   curl -X POST http://localhost:8000/api/approval-chains/requests/REQ_ID/decide \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"decision": "approved", "comment": "Admin override - original approver unavailable"}'
+   ```
+
+---
+
+## SLA False Positives
+
+**Symptoms:**
+- Documents marked as "breached" but action was taken on time
+- Multiple spurious "at_risk" notifications
+- SLA dashboard shows incorrect status
+
+**Causes:**
+- Clock skew between server and clients
+- SLA clock started before the document was actually ready for action
+- Policy `max_duration_hours` is too aggressive for the workflow
+- Timezone handling inconsistencies
+
+**Solutions:**
+1. Check the actual timeline:
+   ```bash
+   # View SLA details
+   curl http://localhost:8000/api/sla/dashboard \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+2. Compare `started_at` and `completed_at` timestamps with workflow history
+3. Adjust the SLA policy if timeframes are unrealistic:
+   ```bash
+   curl -X PUT http://localhost:8000/api/sla-policies/POLICY_ID \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"max_duration_hours": 72}'
+   ```
+4. For timezone issues, ensure all servers use UTC
+5. If an SLA is incorrectly breached, the underlying action will still set status to "completed" when performed
+
+---
+
+## Geo-Fence Blocking Legitimate Users
+
+**Symptoms:**
+- Users receiving 403 errors when accessing documents
+- Access works from office but not from home/VPN
+- Intermittent access failures correlated with network changes
+
+**Causes:**
+- VPN exit node IP not in allowed ranges
+- Country detection incorrect (GeoIP database outdated)
+- New office IP range not added to allow list
+- Overly restrictive rules applied to a broad scope
+
+**Solutions:**
+1. Identify the client IP being blocked:
+   ```bash
+   # Check application logs for geo-fence deny entries
+   grep "geofence" /var/log/edms/app.log
+   ```
+2. Temporarily disable the blocking rule:
+   ```bash
+   curl -X PUT http://localhost:8000/api/geofence/rules/RULE_ID \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"enabled": false}'
+   ```
+3. Add the legitimate IP range to allowed list:
+   ```bash
+   curl -X PUT http://localhost:8000/api/geofence/rules/RULE_ID \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"allowed_ip_ranges": ["10.0.0.0/8", "203.0.113.0/24"]}'
+   ```
+4. Re-enable the rule after updating:
+   ```bash
+   curl -X PUT http://localhost:8000/api/geofence/rules/RULE_ID \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"enabled": true}'
+   ```
+
+---
+
+## Webhook Delivery Failures
+
+**Symptoms:**
+- External systems not receiving event notifications
+- Test webhook returns error
+- Events occurring but no outbound HTTP calls observed
+
+**Causes:**
+- Destination URL unreachable (DNS, firewall, service down)
+- SSL certificate issues on the receiver
+- Webhook secret mismatch (receiver rejects signature)
+- Webhook configuration is_active=false
+- Event type not in the webhook's events list
+
+**Solutions:**
+1. Check webhook configuration:
+   ```bash
+   curl http://localhost:8000/api/webhooks \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+2. Test connectivity to the destination:
+   ```bash
+   curl -v https://destination-url.com/webhook-endpoint
+   ```
+3. Send a test event:
+   ```bash
+   curl -X POST http://localhost:8000/api/webhooks/WEBHOOK_ID/test \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+4. Verify the events array includes the expected event types
+5. Check that `is_active` is true
+6. Verify the secret matches on both EDMS and receiver sides
+
+---
+
+## Obsidian Sync Conflicts
+
+**Symptoms:**
+- Import reports conflicts during sync
+- Pages overwritten unexpectedly
+- Duplicate content after import
+
+**Causes:**
+- Same page modified both in Obsidian and by EDMS document processing
+- Import of outdated vault (changes made in EDMS since last export)
+- File naming conflicts between user-created and auto-generated pages
+
+**Solutions:**
+1. The sync uses a conflict resolution strategy:
+   - **Obsidian wins** for user-created pages (entities/, topics/)
+   - **EDMS wins** for auto-generated summaries (summaries/)
+
+2. To force EDMS content to prevail, remove conflicting pages from the vault before importing
+
+3. Check import results for conflict details:
+   ```bash
+   curl -X POST http://localhost:8000/api/wiki/sync/import \
+     -H "Authorization: Bearer $TOKEN" \
+     -F "file=@vault.zip"
+   ```
+   The response includes `conflicts_resolved` count and details
+
+4. For persistent conflicts, export fresh from EDMS and use as the authoritative source:
+   ```bash
+   curl http://localhost:8000/api/wiki/export/obsidian \
+     -H "Authorization: Bearer $TOKEN" -o fresh-vault.zip
+   ```
+
+---
+
+## Canvas Save Issues
+
+**Symptoms:**
+- Canvas items not persisting after browser refresh
+- Connection lines disappearing
+- "Canvas not found" errors
+- Items appearing at wrong positions
+
+**Causes:**
+- Canvas owned by a different user (ownership check failing)
+- Database connection timeout during save
+- Item IDs reference deleted items (stale connections)
+- Float precision issues with coordinates
+
+**Solutions:**
+1. Verify canvas ownership:
+   ```bash
+   curl http://localhost:8000/api/canvas \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+2. Check that the canvas exists:
+   ```bash
+   curl http://localhost:8000/api/canvas/CANVAS_ID \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+3. For orphaned connections (referencing deleted items), list connections:
+   ```bash
+   curl http://localhost:8000/api/canvas/CANVAS_ID \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+   Delete any connections with invalid from_item_id or to_item_id
+4. For position issues, update item coordinates explicitly:
+   ```bash
+   curl -X PUT http://localhost:8000/api/canvas/CANVAS_ID/items/ITEM_ID \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"x_position": 100.0, "y_position": 200.0}'
+   ```
+
+---
+
+## Offline Package Generation Failures
+
+**Symptoms:**
+- Empty ZIP file returned
+- HTTP 500 on generate endpoint
+- Package missing some documents
+- HTML viewer shows no content
+
+**Causes:**
+- Documents not yet processed (status not "processed")
+- Storage files missing or corrupted
+- Insufficient disk space for temporary ZIP creation
+- Markdown content not generated for some documents
+
+**Solutions:**
+1. Verify all requested documents are processed:
+   ```bash
+   for id in 1 2 3; do
+     curl http://localhost:8000/api/documents/$id/status
+   done
+   ```
+2. Check that markdown files exist for processed documents:
+   ```bash
+   curl http://localhost:8000/api/documents/1/markdown
+   ```
+3. Check disk space (ZIP generation uses temp directory):
+   ```bash
+   df -h /tmp
+   ```
+4. Try with a single document to isolate the issue:
+   ```bash
+   curl -X POST http://localhost:8000/api/offline/generate \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"document_ids": [1]}' -o test.zip
+   ```
+5. If using group_id, verify the group has documents:
+   ```bash
+   curl http://localhost:8000/api/groups/GROUP_ID
+   ```
+
+---
+
+## Multi-Tenant Data Leaks
+
+**Symptoms:**
+- Users seeing documents from another tenant
+- Search returning cross-tenant results
+- API responses containing data from wrong tenant context
+
+**Causes:**
+- Missing X-Tenant-ID header on requests
+- Query missing tenant_id filter (code bug)
+- Shared resources not properly scoped
+- Cache pollution between tenants
+
+**Solutions:**
+1. **Immediately** verify the leak scope:
+   - Which tenants are affected?
+   - What data types leaked?
+   - How long has this been occurring?
+
+2. Check that tenant middleware is active:
+   - Verify `app/middleware/tenant.py` is registered in `app/main.py`
+   - Check that requests include proper tenant headers
+
+3. Verify database queries filter by tenant:
+   - Review recent code changes for queries missing tenant_id
+   - Add integration tests for tenant isolation
+
+4. For immediate mitigation:
+   - Disable cross-tenant access at the middleware level
+   - Audit recent access logs per tenant
+   - Notify affected tenants per your incident response procedure
+
+5. Prevention:
+   - Add automated tenant isolation tests to CI
+   - Code review checklist: "Does this query filter by tenant?"
+   - Consider database-level row security policies (PostgreSQL RLS)

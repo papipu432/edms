@@ -716,3 +716,380 @@ curl -X POST http://localhost:8000/api/health/send-digest \
 ```
 
 This runs the health check and emails the results to all active admin users.
+
+---
+
+## Configure Approval Chains
+
+Set up multi-stage approval workflows for documents.
+
+### Create an approval chain
+
+```bash
+curl -X POST http://localhost:8000/api/approval-chains \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Contract Approval",
+    "folder_id": 1,
+    "steps": [
+      {"step_order": 1, "approval_type": "sequential", "role_code": "reviewer", "timeout_hours": 48},
+      {"step_order": 2, "approval_type": "parallel", "role_code": "approver"}
+    ]
+  }'
+```
+
+### Submit a document for approval
+
+```bash
+curl -X POST http://localhost:8000/api/approval-chains/1/submit \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"document_id": 5}'
+```
+
+### Monitor approval status
+
+Check the current status of a pending approval:
+```bash
+curl http://localhost:8000/api/approval-chains/requests?document_id=5 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Approve or reject at a step
+
+```bash
+curl -X POST http://localhost:8000/api/approval-chains/requests/1/decide \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"decision": "approved", "comment": "Verified and approved"}'
+```
+
+---
+
+## Set Up SLA Policies
+
+Define time-bound service level agreements for document actions.
+
+### Create an SLA policy
+
+```bash
+curl -X POST http://localhost:8000/api/sla-policies \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "folder_id": 1,
+    "action": "approval",
+    "max_duration_hours": 48,
+    "escalation_role": "manager",
+    "is_active": true
+  }'
+```
+
+### Monitor SLA status
+
+View the SLA dashboard to see which items are on time, at risk, or breached:
+```bash
+curl http://localhost:8000/api/sla/dashboard \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Handle SLA breaches
+
+When an SLA is breached, the system:
+1. Updates the document SLA status to "breached"
+2. Sends a notification to users with the `escalation_role`
+3. Sets the `escalated` flag to true
+4. Emits a webhook event (if configured)
+
+Review breached items:
+```bash
+curl "http://localhost:8000/api/sla/dashboard?status=breached" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Enable Geo-Fencing
+
+Restrict access to documents based on IP address or country.
+
+### Create a global deny rule
+
+Block access from specific IP ranges:
+```bash
+curl -X POST http://localhost:8000/api/geofence/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "global",
+    "denied_ip_ranges": ["10.0.0.0/8", "172.16.0.0/12"],
+    "action": "allow",
+    "enabled": true
+  }'
+```
+
+### Restrict to specific countries
+
+```bash
+curl -X POST http://localhost:8000/api/geofence/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "global",
+    "allowed_countries": ["US", "GB", "DE", "FR"],
+    "action": "allow",
+    "enabled": true
+  }'
+```
+
+### Apply rules to a specific folder
+
+```bash
+curl -X POST http://localhost:8000/api/geofence/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": "group",
+    "scope_id": 3,
+    "allowed_countries": ["US"],
+    "action": "allow",
+    "enabled": true
+  }'
+```
+
+### Verify rules are applied
+
+The geo-fence middleware runs on every request. Test by checking access from different IPs:
+```bash
+curl -H "X-Forwarded-For: 203.0.113.1" http://localhost:8000/api/documents \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Configure Webhooks
+
+Send notifications to external systems when events occur in EDMS.
+
+### Register a webhook
+
+```bash
+curl -X POST http://localhost:8000/api/webhooks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://hooks.slack.com/services/T00/B00/xxxx",
+    "secret": "my-signing-secret-123",
+    "events": ["document.created", "document.approved", "sla.breached"],
+    "is_active": true
+  }'
+```
+
+### Test the webhook
+
+Sends a test payload to verify connectivity:
+```bash
+curl -X POST http://localhost:8000/api/webhooks/1/test \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Verify webhook signatures
+
+On the receiving end, verify the `X-Webhook-Signature` header:
+```python
+import hmac, hashlib
+
+def verify_webhook(body: bytes, signature: str, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+```
+
+### Available event types
+
+- `document.created` - New document uploaded
+- `document.approved` - Document approved via workflow
+- `document.deleted` - Document deleted
+- `lifecycle.expired` - Document lifecycle expired
+- `lifecycle.transitioned` - Lifecycle state changed
+- `sla.at_risk` - SLA approaching deadline
+- `sla.breached` - SLA deadline passed
+- `approval.submitted` - Document submitted to approval chain
+- `approval.decided` - Approval decision made
+
+---
+
+## Use the Canvas/Whiteboard
+
+Create spatial arrangements of documents for visual organization.
+
+### Create a canvas
+
+```bash
+curl -X POST http://localhost:8000/api/canvas \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Project Architecture"}'
+```
+
+### Add documents to the canvas
+
+```bash
+# Add a document card
+curl -X POST http://localhost:8000/api/canvas/1/items \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_id": 5,
+    "x_position": 100.0,
+    "y_position": 200.0,
+    "width": 250.0,
+    "height": 150.0,
+    "color": "#3b82f6"
+  }'
+
+# Add a text note
+curl -X POST http://localhost:8000/api/canvas/1/items \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "note_text": "This section needs review",
+    "x_position": 400.0,
+    "y_position": 200.0,
+    "width": 200.0,
+    "height": 100.0,
+    "color": "#ef4444"
+  }'
+```
+
+### Connect items
+
+```bash
+curl -X POST http://localhost:8000/api/canvas/1/connections \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"from_item_id": 1, "to_item_id": 2, "label": "depends on"}'
+```
+
+### Export as .canvas format
+
+Export the canvas in Obsidian-compatible format:
+```bash
+curl http://localhost:8000/api/canvas/1/export \
+  -H "Authorization: Bearer $TOKEN" > project-architecture.canvas
+```
+
+---
+
+## Generate Offline Packages
+
+Create self-contained document packages for access without a server.
+
+### Generate package for specific documents
+
+```bash
+curl -X POST http://localhost:8000/api/offline/generate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"document_ids": [1, 2, 3, 4, 5]}' \
+  -o offline-package.zip
+```
+
+### Generate package for an entire group
+
+```bash
+curl -X POST http://localhost:8000/api/offline/generate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"group_id": 1}' \
+  -o engineering-docs-offline.zip
+```
+
+### Using the offline package
+
+1. Unzip the downloaded package
+2. Open `index.html` in any web browser
+3. Browse documents, view markdown content, and search - all without a network connection
+
+---
+
+## Import from External Systems
+
+Import documents and metadata from other systems.
+
+### Import from ZIP with manifest
+
+Create a ZIP file containing:
+- `manifest.json` - Document metadata (filenames, groups, tags)
+- Document files referenced in the manifest
+
+```bash
+curl -X POST http://localhost:8000/api/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@migration-package.zip"
+```
+
+### Import from CSV
+
+Create a CSV with columns: `filename`, `group`, `tags`, `lifecycle_type`:
+
+```bash
+curl -X POST http://localhost:8000/api/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@document-metadata.csv"
+```
+
+### Export for migration
+
+Export all documents and metadata for migration to another system:
+
+```bash
+curl http://localhost:8000/api/export \
+  -H "Authorization: Bearer $TOKEN" \
+  -o full-export.zip
+```
+
+---
+
+## Set Up Multi-Tenant
+
+Configure EDMS for multiple isolated tenants sharing a single deployment.
+
+### Create a tenant
+
+```bash
+curl -X POST http://localhost:8000/api/tenants \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corporation",
+    "slug": "acme",
+    "settings": {"max_storage_gb": 100, "max_users": 50}
+  }'
+```
+
+### Access as a specific tenant
+
+Include the `X-Tenant-ID` header with the tenant slug:
+```bash
+curl http://localhost:8000/api/documents \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Tenant-ID: acme"
+```
+
+### Manage tenant settings
+
+```bash
+curl -X PUT http://localhost:8000/api/tenants/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"settings": {"max_storage_gb": 200, "max_users": 100, "features": ["canvas", "webhooks"]}}'
+```
+
+### Tenant isolation
+
+Each tenant has:
+- Separate document storage directories
+- Isolated database queries (all data scoped by tenant_id)
+- Independent settings and configurations
+- Users belonging to exactly one tenant

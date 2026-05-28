@@ -483,3 +483,244 @@ Before going to production, verify each item:
 - [ ] Log rotation is configured
 - [ ] Firewall rules restrict database port access
 - [ ] OpenAI API key has spending limits configured
+
+---
+
+## Geo-Fencing Architecture
+
+### Overview
+
+EDMS implements IP-based and country-based access control through a middleware layer that evaluates rules before requests reach route handlers.
+
+### Rule Evaluation Order
+
+1. Rules are loaded from the `geofence_rules` table
+2. More specific scopes (document > group > global) take priority
+3. Within a scope, deny rules are evaluated before allow rules
+4. If a deny rule matches, the request is blocked with 403
+5. If no rules match, the default is to allow access
+
+### IP Range Matching
+
+Uses CIDR notation for IP range matching:
+- `192.168.1.0/24` - Matches all IPs in the 192.168.1.x range
+- `10.0.0.0/8` - Matches all 10.x.x.x addresses
+- `0.0.0.0/0` - Matches all IPv4 addresses
+
+### Country Detection
+
+Country-based filtering requires a GeoIP database (MaxMind GeoLite2 or similar). When configured:
+- Client IP is resolved to ISO 3166-1 alpha-2 country code
+- Matched against `allowed_countries` or `denied_countries` lists
+
+### Security Considerations
+
+- Geo-fencing is defense-in-depth; it does not replace authentication
+- VPN users may appear to be in a different country
+- Always maintain emergency access procedures for geo-fence failures
+- Log all denied requests for audit purposes
+
+---
+
+## Watermarking Forensics
+
+### How Watermarks Work
+
+EDMS applies forensic watermarks to documents when downloaded or previewed:
+
+1. **Template Expansion**: Variables in `text_template` are replaced:
+   - `{user}` - Username of the requesting user
+   - `{timestamp}` - Current ISO timestamp
+   - `{doc_id}` - Document ID
+   
+2. **Overlay Application**: 
+   - PDF: Text overlay with configurable opacity and position
+   - Images: Semi-transparent text burned into the image
+
+3. **Traceability**: If a watermarked document leaks, the embedded user/timestamp identifies the source
+
+### Configuration Per Group
+
+Different groups can have different watermark settings:
+- Public docs: No watermark (enabled=false)
+- Internal docs: Light watermark (opacity=0.1)
+- Confidential: Bold watermark (opacity=0.5, position=diagonal)
+
+### Forensic Investigation
+
+When a leaked document is found:
+1. Examine the watermark text to identify the user
+2. Cross-reference with session recording to confirm download
+3. Review the user's session history for other downloads
+
+---
+
+## E-Signature Verification
+
+### Signature Architecture
+
+EDMS signatures combine multiple verification methods:
+
+1. **SHA-256 Hash**: Document content hash at time of signing
+2. **QR Code**: Contains verification URL and signature hash
+3. **X.509 Certificate** (optional): Cryptographic binding to signer identity
+
+### Verification Process
+
+To verify a signature:
+```bash
+curl http://localhost:8000/api/signatures/verify/{signature_hash}
+```
+
+The system checks:
+1. The signature record exists in the database
+2. The stored hash matches the current document content hash
+3. If a certificate is present, the signature cryptographically verifies
+4. The `is_valid` flag has not been revoked
+
+### Signature Invalidation
+
+A signature becomes invalid when:
+- The document content changes after signing (hash mismatch)
+- An administrator manually revokes the signature
+- The signing certificate is revoked or expired
+
+### Audit Trail
+
+All signature operations are logged:
+- Who signed
+- When they signed
+- The document hash at signing time
+- Whether a certificate was used
+
+---
+
+## Access Request Audit
+
+### Audit Trail for Access Requests
+
+Every access request lifecycle is tracked:
+- Request creation (who, what resource, why)
+- Review decision (who approved/denied, when)
+- Access grant/revocation
+
+### Compliance Reporting
+
+Generate access request audit reports:
+```bash
+curl -X POST http://localhost:8000/api/compliance/reports \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"report_type": "access_log"}'
+```
+
+### Review Process
+
+1. User submits access request with reason
+2. Admin reviews pending requests
+3. Admin approves or denies with audit record
+4. If approved, user gains access immediately
+5. All decisions are immutable and timestamped
+
+---
+
+## Session Recording Privacy
+
+### What is Recorded
+
+The session recording system tracks:
+- Session start/end times
+- Client IP address and user agent
+- Documents accessed (view, download, edit actions)
+- Timestamps for each access
+
+### What is NOT Recorded
+
+- Document content viewed
+- Screen captures or keystrokes
+- Non-document page views
+- Passwords or authentication tokens
+
+### Data Retention
+
+Configure session data retention in production:
+- Default: Sessions retained indefinitely
+- Recommendation: Implement periodic purging of sessions older than retention period
+- Comply with GDPR/privacy requirements for your jurisdiction
+
+### Access to Session Data
+
+Only administrators can query session data:
+```bash
+curl http://localhost:8000/api/sessions -H "Authorization: Bearer $TOKEN"
+```
+
+Users cannot view their own session recordings through the standard API.
+
+---
+
+## Webhook Secret Rotation
+
+### Why Rotate Secrets
+
+Webhook secrets should be rotated:
+- Periodically (every 90 days recommended)
+- When personnel with access leave the organization
+- After any suspected compromise
+- When the receiving system is migrated
+
+### Rotation Procedure
+
+1. **Generate new secret** on the receiver side
+2. **Update EDMS webhook config**:
+   ```bash
+   curl -X PUT http://localhost:8000/api/webhooks/1 \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"secret": "new-rotated-secret"}'
+   ```
+3. **Verify delivery** with a test event:
+   ```bash
+   curl -X POST http://localhost:8000/api/webhooks/1/test \
+     -H "Authorization: Bearer $TOKEN"
+   ```
+4. **Remove old secret** from the receiver once verified
+
+### HMAC Signature Format
+
+Webhooks use HMAC-SHA256:
+```
+X-Webhook-Signature: <hex-encoded HMAC-SHA256(secret, raw_body)>
+```
+
+---
+
+## Multi-Tenant Isolation Guarantees
+
+### Data Isolation
+
+- **Database**: All queries include tenant_id filter; cross-tenant access is architecturally prevented
+- **Storage**: Separate file system paths per tenant
+- **Search**: ChromaDB collections are tenant-scoped
+- **Wiki**: Each tenant has an independent wiki directory
+
+### Configuration Isolation
+
+- Tenant settings (JSON column) control per-tenant behavior
+- Feature flags can enable/disable features per tenant
+- Storage quotas are enforced per tenant
+
+### Security Boundaries
+
+- Authentication tokens are tenant-scoped
+- Admin of one tenant cannot access another tenant's data
+- System administrators (super-admins) can manage all tenants
+- Tenant deactivation immediately blocks all access
+
+### Testing Isolation
+
+Regularly verify isolation with automated tests:
+1. Create data in Tenant A
+2. Switch to Tenant B context
+3. Verify Tenant A's data is not accessible
+4. Test all endpoints with cross-tenant scenarios
