@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.group import Base
@@ -51,6 +51,7 @@ class Document(Base):
         Integer, ForeignKey("document_templates.id", ondelete="SET NULL"), nullable=True
     )
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")
+    ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     group: Mapped["Group"] = relationship(back_populates="documents")  # noqa: F821
     versions: Mapped[list["DocumentVersion"]] = relationship(back_populates="document")

@@ -261,7 +261,22 @@ class ConversionService:
             try:
                 import pytesseract
 
-                text = pytesseract.image_to_string(processed)
+                # Use image_to_data for confidence scores
+                try:
+                    data = pytesseract.image_to_data(
+                        processed, output_type=pytesseract.Output.DATAFRAME
+                    )
+                    # Filter valid confidence values (conf > -1 means recognized)
+                    valid_conf = data[data["conf"] > -1]["conf"]
+                    if len(valid_conf) > 0:
+                        avg_confidence = float(valid_conf.mean())
+                        result.metadata["ocr_confidence"] = avg_confidence
+                    # Still get text via image_to_string for best output
+                    text = pytesseract.image_to_string(processed)
+                except Exception:
+                    # Fallback to just image_to_string if data extraction fails
+                    text = pytesseract.image_to_string(processed)
+
                 result.markdown_content = text.strip()
             except Exception as e:
                 logger.warning(

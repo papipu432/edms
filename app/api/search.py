@@ -23,7 +23,9 @@ from app.schemas.search_enhanced import (
     SearchHistoryResponse,
     SuggestionsResponse,
 )
+from app.schemas.natural_search import NaturalSearchRequest, NaturalSearchResponse
 from app.services.search_enhanced import EnhancedSearchService
+from app.services.natural_search import NaturalSearchService
 from app.services.vectordb import VectorDBService
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ router = APIRouter(tags=["search"])
 
 vectordb_service = VectorDBService()
 enhanced_search_service = EnhancedSearchService(vectordb_service=vectordb_service)
+natural_search_service = NaturalSearchService()
 
 
 @router.post("/api/search", response_model=SearchResponse)
@@ -171,3 +174,21 @@ async def clear_search_history(
     """Clear current user's search history."""
     await enhanced_search_service.clear_search_history(db, current_user.id)
     return {"detail": "Search history cleared"}
+
+
+@router.post("/api/search/natural", response_model=NaturalSearchResponse)
+async def natural_language_search(
+    request: NaturalSearchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> NaturalSearchResponse:
+    """Search using natural language queries parsed by LLM."""
+    interpreted_query, results, parse_method = await natural_search_service.search(
+        db, request.query
+    )
+    return NaturalSearchResponse(
+        interpreted_query=interpreted_query,
+        results=results,
+        raw_query=request.query,
+        parse_method=parse_method,
+    )

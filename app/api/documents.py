@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_optional_user
+from app.core.security import get_current_user, get_optional_user
 from app.models.document import Document, DocumentStatus
 from app.models.group import Group
 from app.models.user import User
@@ -16,6 +16,7 @@ from app.schemas.document import (
     DocumentResponse,
     DocumentStatusResponse,
 )
+from app.schemas.ocr_quality import OCRQualityResponse
 from app.services.audit import AuditService
 from app.services.pipeline import PipelineService
 from app.services.storage import StorageService
@@ -231,3 +232,25 @@ async def get_document_markdown(
 
     content = Path(document.markdown_path).read_text(encoding="utf-8")
     return PlainTextResponse(content=content, media_type="text/markdown")
+
+
+@router.get("/api/documents/{document_id}/ocr-quality", response_model=OCRQualityResponse)
+async def get_ocr_quality(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> OCRQualityResponse:
+    """Get OCR confidence score and quality info for a document."""
+    document = await db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    confidence = document.ocr_confidence
+    needs_review = confidence is not None and confidence < 70.0
+
+    return OCRQualityResponse(
+        document_id=document.id,
+        ocr_confidence=confidence,
+        needs_review=needs_review,
+        page_confidences=None,
+    )

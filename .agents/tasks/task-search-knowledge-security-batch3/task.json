@@ -1,0 +1,7 @@
+{
+  "task_id": "task-search-knowledge-security-batch3",
+  "task_description": "Implement Batch 3 features for EDMS: Search & Knowledge (natural language queries, knowledge graph visualization, comparative analysis, OCR confidence scoring) and Security & Compliance (compliance reporting, geo-fencing, watermarking, access request workflow, session recording)",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

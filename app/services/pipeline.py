@@ -115,6 +115,10 @@ class PipelineService:
             # Update document in DB
             document.markdown_path = str(markdown_path)
 
+            # Set OCR confidence from conversion metadata if available
+            if "ocr_confidence" in result.metadata:
+                document.ocr_confidence = result.metadata["ocr_confidence"]
+
             # Generate summary and keywords using LLM
             markdown_content = result.markdown_content
 
