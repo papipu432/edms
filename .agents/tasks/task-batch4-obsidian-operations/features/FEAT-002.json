@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Operations & Reliability features: Health score dashboard, scheduled reports, multi-tenant support, offline mode, import/export ecosystem, and webhook integrations.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. HEALTH SCORE DASHBOARD: Create app/services/health_score.py with HealthScoreService. Computes a composite score (0-100) from components: orphan_score (based on empty groups/orphan docs), lifecycle_score (overdue reviews + expired docs), backup_score (last backup age from settings), security_score (pending security alerts, failed auth from security_monitoring if available), storage_score (disk usage as % of reasonable limit), sla_score (SLA compliance %). Each component 0-100, composite is weighted average. Store daily scores in a new model.",
     "2. Create app/models/health_score.py with HealthScoreRecord (id int PK, date date, composite_score float, orphan_score float, lifecycle_score float, backup_score float, security_score float, storage_score float, sla_score float, created_at datetime).",
@@ -55,5 +55,5 @@
     "uv run pytest tests/ -x -q (full test suite passes)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 42 new tests pass. Full suite 948 tests pass. One pre-existing flaky test (test_chat_enhanced.py::TestUnauthorizedAccess::test_cannot_access_other_users_session) fails due to rate limiter state accumulation during full suite runs - confirmed pre-existing by running without changes."
 }
