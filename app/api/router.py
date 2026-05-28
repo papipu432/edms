@@ -39,7 +39,10 @@ from app.api.workflow import router as workflow_router
 from app.api.approval_chains import router as approval_chains_router
 from app.api.audit import router as audit_router
 from app.api.comments import router as comments_router
+from app.api.delegations import router as delegations_router
 from app.api.document_locks import router as document_locks_router
+from app.api.signatures import router as signatures_router
+from app.api.sla import router as sla_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -82,3 +85,6 @@ api_router.include_router(onboarding_router)
 api_router.include_router(approval_chains_router)
 api_router.include_router(comments_router)
 api_router.include_router(document_locks_router)
+api_router.include_router(signatures_router)
+api_router.include_router(delegations_router)
+api_router.include_router(sla_router)

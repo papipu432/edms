@@ -36,6 +36,8 @@ dependencies = [
     "uvicorn[standard]>=0.48.0",
     "watchdog>=4.0.0",
     "pycryptodome>=3.20.0",
+    "qrcode>=8.2",
+    "cryptography>=48.0.0",
 ]
 
 [project.optional-dependencies]

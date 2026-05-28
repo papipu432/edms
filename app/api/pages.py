@@ -76,3 +76,8 @@ async def templates_page(request: Request):
 @router.get("/admin/users")
 async def admin_users_page(request: Request):
     return templates.TemplateResponse(request, "admin_users.html")
+
+
+@router.get("/workflow-builder")
+async def workflow_builder_page(request: Request):
+    return templates.TemplateResponse(request, "workflow_builder.html")
