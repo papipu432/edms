@@ -23,6 +23,9 @@ class Group(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=True
+    )
 
     parent: Mapped["Group | None"] = relationship(
         "Group", remote_side=[id], back_populates="children", foreign_keys=[parent_id]

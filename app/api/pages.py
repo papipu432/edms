@@ -91,3 +91,8 @@ async def wiki_graph_page(request: Request):
 @router.get("/pages/canvas")
 async def canvas_page(request: Request):
     return templates.TemplateResponse(request, "canvas.html")
+
+
+@router.get("/pages/health-score")
+async def health_score_page(request: Request):
+    return templates.TemplateResponse(request, "health_score_dashboard.html")

@@ -53,6 +53,12 @@ from app.api.delegations import router as delegations_router
 from app.api.document_locks import router as document_locks_router
 from app.api.signatures import router as signatures_router
 from app.api.sla import router as sla_router
+from app.api.health_score import router as health_score_router
+from app.api.scheduled_reports import router as scheduled_reports_router
+from app.api.tenants import router as tenants_router
+from app.api.offline import router as offline_router
+from app.api.import_export import router as import_export_router
+from app.api.webhooks import router as webhooks_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -108,3 +114,9 @@ api_router.include_router(obsidian_sync_router)
 api_router.include_router(daily_notes_router)
 api_router.include_router(wiki_graph_router)
 api_router.include_router(canvas_router)
+api_router.include_router(health_score_router)
+api_router.include_router(scheduled_reports_router)
+api_router.include_router(tenants_router)
+api_router.include_router(offline_router)
+api_router.include_router(import_export_router)
+api_router.include_router(webhooks_router)

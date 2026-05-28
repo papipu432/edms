@@ -51,6 +51,9 @@ class User(Base):
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=True
+    )
 
     # Relations
     user_roles: Mapped[list["UserRole"]] = relationship(
