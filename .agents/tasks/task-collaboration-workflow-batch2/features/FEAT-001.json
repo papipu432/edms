@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Multi-stage approval chains, comments/discussion threads, @mentions, and document checkout/lock. This feature adds: (1) ApprovalChain/ApprovalStep models for sequential and parallel approval workflows, configurable per folder/template. (2) Comment model for per-document threaded discussions with markdown support. (3) @mention detection in comments creating notifications via existing WebSocket system. (4) DocumentLock model for checkout/lock with configurable expiry and admin force-unlock.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Install new dependencies: Add 'qrcode[pil]' and 'cryptography' to pyproject.toml dependencies using uv add (needed for later features but install now to avoid issues). Run uv sync.",
     "Step 2 - Create app/models/approval.py with: ApprovalChain (id int PK, name str, folder_id FK nullable to groups.id, template_id FK nullable to document_templates.id, is_active bool, created_at). ApprovalStep (id int PK, chain_id FK to approval_chains.id CASCADE, step_order int, approval_type enum 'sequential'/'parallel', role_code str nullable, user_id str FK nullable to users.id, timeout_hours int nullable, created_at). ApprovalRequest (id int PK, document_id FK to documents.id CASCADE, chain_id FK to approval_chains.id, status enum 'pending'/'approved'/'rejected', current_step_order int, submitted_by str FK to users.id, submitted_at datetime, completed_at datetime nullable). ApprovalDecision (id int PK, request_id FK to approval_requests.id CASCADE, step_id FK to approval_steps.id, user_id str FK to users.id, decision enum 'approved'/'rejected', comment text nullable, decided_at datetime).",
@@ -33,5 +33,5 @@
     "uv run pytest tests/ -q --tb=short"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Used naive datetimes (datetime.utcnow()) instead of timezone-aware (datetime.now(timezone.utc)) for SQLite compatibility. Total test count went from 697 to 722 (25 new tests). All existing tests continue to pass."
 }
