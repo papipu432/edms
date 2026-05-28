@@ -30,3 +30,7 @@ storage/
 wiki/
 chroma_db/
 chroma_data/
+
+# TLS certificates (generated, not committed)
+nginx/certs/*
+!nginx/certs/.gitkeep
