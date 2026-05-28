@@ -95,8 +95,15 @@ class BulkService:
                 await db.flush()
                 await db.refresh(document)
 
-                background_tasks.add_task(
-                    _run_pipeline, document.id, pipeline_db_url, storage_service
+                from app.tasks.document import process_document_task
+                from app.tasks.utils import dispatch_task
+
+                dispatch_task(
+                    process_document_task,
+                    background_tasks,
+                    _run_pipeline,
+                    document.id,
+                    pipeline_db_url,
                 )
 
                 results.append(

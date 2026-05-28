@@ -32,14 +32,14 @@ audit_service = AuditService()
 pipeline_db_url: str = settings.DATABASE_URL
 
 
-async def _run_pipeline(doc_id: int, db_url: str, storage_svc: StorageService) -> None:
+async def _run_pipeline(doc_id: int, db_url: str) -> None:
     """Run the processing pipeline in a background task with its own DB session."""
     engine = create_async_engine(db_url, echo=False)
     session_factory = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
     )
     async with session_factory() as session:
-        svc = PipelineService(storage_service=storage_svc)
+        svc = PipelineService(storage_service=StorageService())
         await svc.process_document(doc_id, session)
     await engine.dispose()
 
@@ -86,8 +86,15 @@ async def upload_document(
     await db.flush()
     await db.refresh(document)
 
-    background_tasks.add_task(
-        _run_pipeline, document.id, pipeline_db_url, storage_service
+    from app.tasks.document import process_document_task
+    from app.tasks.utils import dispatch_task
+
+    dispatch_task(
+        process_document_task,
+        background_tasks,
+        _run_pipeline,
+        document.id,
+        pipeline_db_url,
     )
 
     await audit_service.log_action(

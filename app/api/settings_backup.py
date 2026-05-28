@@ -190,7 +190,12 @@ async def trigger_backup(
     await db.refresh(job)
     job_id = job.id
 
-    background_tasks.add_task(_run_backup_task, job_id, target)
+    from app.tasks.backup import trigger_backup_task
+    from app.tasks.utils import dispatch_task
+
+    dispatch_task(
+        trigger_backup_task, background_tasks, _run_backup_task, job_id, target
+    )
 
     return {
         "status": "ok",
