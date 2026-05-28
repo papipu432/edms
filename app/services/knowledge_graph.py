@@ -19,17 +19,19 @@ class KnowledgeGraphService:
         group_id: int | None = None,
         entity: str | None = None,
         relationship_type: str | None = None,
+        limit: int = 500,
     ) -> KnowledgeGraphResponse:
         """Build a knowledge graph from documents, groups, and relationships."""
         nodes: dict[str, KGNode] = {}
         edges: list[KGEdge] = []
 
-        # Query documents with optional filters
+        # Query documents with optional filters, capped at limit
         doc_query = select(Document)
         if document_id is not None:
             doc_query = doc_query.where(Document.id == document_id)
         if group_id is not None:
             doc_query = doc_query.where(Document.group_id == group_id)
+        doc_query = doc_query.limit(limit)
 
         result = await db.execute(doc_query)
         documents = result.scalars().all()
@@ -155,8 +157,8 @@ class KnowledgeGraphService:
 
         # If entity filter applied and no documents matched keywords, include all entity-matching nodes
         if entity and not documents:
-            # Search for documents with matching keywords
-            all_docs_result = await db.execute(select(Document))
+            # Search for documents with matching keywords (capped at limit)
+            all_docs_result = await db.execute(select(Document).limit(limit))
             all_docs = all_docs_result.scalars().all()
             for doc in all_docs:
                 if doc.keywords and isinstance(doc.keywords, list):

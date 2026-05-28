@@ -19,6 +19,7 @@ from app.schemas.document import (
 from app.schemas.ocr_quality import OCRQualityResponse
 from app.services.audit import AuditService
 from app.services.pipeline import PipelineService
+from app.services.session_recording import record_access
 from app.services.storage import StorageService
 
 router = APIRouter(tags=["documents"])
@@ -112,6 +113,7 @@ async def list_documents(db: AsyncSession = Depends(get_db)) -> dict:
 async def get_document(
     document_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ) -> Document:
@@ -125,6 +127,16 @@ async def get_document(
         actor=current_user,
         request=request,
     )
+    if current_user is not None:
+        background_tasks.add_task(
+            record_access,
+            db,
+            current_user.id,
+            document.id,
+            "view",
+            request.client.host if request.client else None,
+            request.headers.get("user-agent"),
+        )
     return document
 
 
@@ -159,6 +171,7 @@ async def delete_document(
 async def download_document(
     document_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ) -> FileResponse:
@@ -173,6 +186,17 @@ async def download_document(
         actor=current_user,
         request=request,
     )
+
+    if current_user is not None:
+        background_tasks.add_task(
+            record_access,
+            db,
+            current_user.id,
+            document.id,
+            "download",
+            request.client.host if request.client else None,
+            request.headers.get("user-agent"),
+        )
 
     if document.encrypted_pdf_path and Path(document.encrypted_pdf_path).exists():
         return FileResponse(

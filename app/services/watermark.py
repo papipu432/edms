@@ -44,14 +44,17 @@ class WatermarkService:
         doc_id: str = "",
         custom_text: str = "",
     ) -> str:
-        """Substitute variables in watermark text template."""
+        """Substitute variables in watermark text template.
+
+        Uses str.replace() instead of str.format() to avoid format string
+        injection when user-controlled values contain format specifiers.
+        """
         timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        return template.format(
-            user=user,
-            timestamp=timestamp,
-            doc_id=doc_id,
-            custom_text=custom_text,
-        )
+        text = template.replace("{user}", user)
+        text = text.replace("{timestamp}", timestamp)
+        text = text.replace("{doc_id}", str(doc_id))
+        text = text.replace("{custom_text}", custom_text or "")
+        return text
 
     def apply_pdf_watermark(
         self,
@@ -133,11 +136,8 @@ class WatermarkService:
             wm_pdf = pikepdf.open(wm_pdf_buffer)
             if len(wm_pdf.pages) > 0:
                 wm_page = wm_pdf.pages[0]
-                # Use pikepdf page overlay
-                page_obj = page.obj
-                if "/Contents" in page_obj:
-                    # Add watermark as an overlay using form XObject
-                    pass  # Simple approach: just save with annotations
+                # Use pikepdf's add_overlay to merge the watermark page onto this page
+                page.add_overlay(wm_page)
 
             wm_pdf.close()
 

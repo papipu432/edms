@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.access_request import AccessRequest
+from app.models.audit import DocumentAuditLog
 from app.services.notifications import get_notification_manager
 
 
@@ -88,7 +89,11 @@ class AccessRequestService:
         request_id: int,
         reviewer_id: str,
     ) -> AccessRequest | None:
-        """Approve an access request."""
+        """Approve an access request and log the access grant.
+
+        Note: Full ACL integration would require a GroupMembership model.
+        Currently, approval is recorded in the audit log as evidence of the grant.
+        """
         result = await db.execute(
             select(AccessRequest).where(AccessRequest.id == request_id)
         )
@@ -99,6 +104,31 @@ class AccessRequestService:
         access_request.status = "approved"
         access_request.reviewed_by = reviewer_id
         access_request.reviewed_at = datetime.now(timezone.utc)
+
+        # Log the access grant in the audit trail so there is a record of
+        # the permission being conferred. For resource_type="document", the
+        # document_id is the resource; for "group" we record with document_id
+        # set to None and capture details in the JSON payload.
+        doc_id = (
+            access_request.resource_id
+            if access_request.resource_type == "document"
+            else None
+        )
+        audit_entry = DocumentAuditLog(
+            document_id=doc_id,
+            action="access_granted",
+            actor_id=reviewer_id,
+            actor_username=None,
+            details_json={
+                "request_id": access_request.id,
+                "requester_id": access_request.requester_id,
+                "resource_type": access_request.resource_type,
+                "resource_id": access_request.resource_id,
+                "reason": access_request.reason,
+            },
+        )
+        db.add(audit_entry)
+
         await db.flush()
         await db.refresh(access_request)
         return access_request

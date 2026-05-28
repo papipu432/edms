@@ -19,6 +19,7 @@ async def get_knowledge_graph(
     group_id: int | None = Query(None, description="Filter by group ID"),
     entity: str | None = Query(None, description="Filter by entity name"),
     relationship_type: str | None = Query(None, description="Filter by relationship type"),
+    limit: int = Query(500, ge=1, le=2000, description="Maximum number of document nodes"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> KnowledgeGraphResponse:
@@ -29,6 +30,7 @@ async def get_knowledge_graph(
         group_id=group_id,
         entity=entity,
         relationship_type=relationship_type,
+        limit=limit,
     )
 
 
