@@ -463,3 +463,94 @@ async def list_user_grades(
         }
         for g in grades
     ]
+
+
+# ── API: User Status & Auto-Reassignment ─────────────────────────────────────
+
+
+from app.models.user import UserStatus
+from app.services.auto_reassignment import AutoReassignmentService
+from pydantic import BaseModel
+
+
+class UserStatusUpdate(BaseModel):
+    status: UserStatus
+    reason: str | None = None
+
+
+@router.put("/api/users/{user_id}/status", response_model=dict)
+async def update_user_status(
+    user_id: str,
+    data: UserStatusUpdate,
+    current_user: User = Depends(require_permission("users", "update")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update user status and trigger automatic reassignment of tasks/responsibilities.
+    
+    When a user is marked as resigned/terminated/MIA, their:
+    - Workflow tasks are reassigned to position replacements or escalated up
+    - Org assignments are deactivated
+    - Responsibilities escalate to higher structure (position head → parent unit head → admin)
+    """
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    old_status = user.status
+    user.status = data.status
+    user.status_changed_at = func.now()
+    user.status_changed_by = current_user.id
+    
+    if data.reason:
+        # Store reason in notes or audit log
+        pass
+    
+    # Trigger auto-reassignment service
+    reassignment_service = AutoReassignmentService(db)
+    reassignment_result = await reassignment_service.handle_user_status_change(
+        user_id=user_id,
+        new_status=data.status,
+        changed_by=current_user.id
+    )
+    
+    await db.flush()
+    
+    return {
+        "success": True,
+        "user_id": user_id,
+        "old_status": old_status.value,
+        "new_status": data.status.value,
+        "reassignment": reassignment_result,
+    }
+
+
+@router.get("/api/users/mia-check", response_model=list[dict])
+async def check_mia_users(
+    days_threshold: int = 7,
+    _user: User = Depends(require_permission("users", "read")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check for users who haven't been seen in threshold days."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_threshold)
+    
+    result = await db.execute(
+        select(User)
+        .where(User.status == UserStatus.active)
+        .where(User.last_seen_at != None)
+        .where(User.last_seen_at < cutoff)
+    )
+    mia_candidates = result.scalars().all()
+    
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "display_name": u.display_name,
+            "email": u.email,
+            "last_seen": u.last_seen_at.isoformat() if u.last_seen_at else None,
+            "days_inactive": (datetime.now(timezone.utc) - u.last_seen_at).days if u.last_seen_at else None,
+        }
+        for u in mia_candidates
+    ]

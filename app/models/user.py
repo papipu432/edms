@@ -33,6 +33,14 @@ class RoleName(str, enum.Enum):
 # ── Users ────────────────────────────────────────────────────────────────────
 
 
+class UserStatus(str, enum.Enum):
+    active = "active"
+    resigned = "resigned"
+    terminated = "terminated"
+    mia = "mia"  # Missing In Action
+    on_leave = "on_leave"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -44,6 +52,14 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(256), unique=True, index=True)
     hashed_password: Mapped[str | None] = mapped_column(String(256))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus), default=UserStatus.active, nullable=False
+    )
+    status_changed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    status_changed_by: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id")
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime)
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     is_ldap: Mapped[bool] = mapped_column(Boolean, default=False)
     ldap_dn: Mapped[str | None] = mapped_column(String(512))
