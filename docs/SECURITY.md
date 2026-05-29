@@ -724,3 +724,71 @@ Regularly verify isolation with automated tests:
 2. Switch to Tenant B context
 3. Verify Tenant A's data is not accessible
 4. Test all endpoints with cross-tenant scenarios
+
+---
+
+## Auto-Reassignment Security
+
+### User Status Management
+
+The system tracks user employment status for automatic task reassignment:
+
+| Status | Description | Auto-Reassignment Triggered |
+|--------|-------------|----------------------------|
+| `active` | Normal employment | No |
+| `resigned` | Voluntary resignation | Yes - immediate |
+| `terminated` | Involuntary termination | Yes - immediate |
+| `mia` | Missing/unreachable > 7 days | Yes - after grace period |
+| `on_leave` | Temporary leave (vacation, medical) | Optional - based on duration |
+
+### Escalation Hierarchy
+
+When auto-reassignment triggers, tasks escalate through:
+1. **Same position** - Other users in the same org position
+2. **Position head** - User marked as head of the position
+3. **Unit head** - Head of the organizational unit
+4. **Parent unit head** - Escalate up the org tree
+5. **System admin** - Final fallback
+
+### Audit Trail
+
+All auto-reassignments are logged:
+- Original assignee and their status
+- New assignee and escalation path taken
+- Timestamp and triggering event
+- Affected workflow tasks/documents
+
+### Prevention of Abuse
+
+- Only users with `manager` or `admin` role can change user status
+- Status changes require reason field
+- All status changes logged in audit trail
+- MIA detection requires multiple failed contact attempts
+
+---
+
+## Airgap Deployment Security
+
+### Offline Package Generation
+
+For airgap environments, EDMS supports offline package generation:
+- Self-contained ZIP archives with embedded HTML viewer
+- Documents encrypted with recipient-specific keys
+- No external network calls required
+- Packages can be transferred via secure media
+
+### Ransomware Early Detection in Airgap
+
+Even in airgap deployments:
+- Filesystem monitoring runs locally
+- Entropy analysis detects encryption patterns
+- Quarantine isolates suspicious files
+- Alerts logged for admin review
+
+### Backup Key Isolation
+
+Airgap backup strategy:
+- Production KEK never leaves primary environment
+- Backup KEK stored separately
+- Encrypted backups can be transferred to DR site
+- Key recovery requires Shamir share holders from both sites

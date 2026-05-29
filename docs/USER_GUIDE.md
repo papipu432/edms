@@ -2,6 +2,54 @@
 
 This guide is for end users of the EDMS system. It covers day-to-day tasks like uploading documents, using workflows, and searching content.
 
+## New Features (Latest Release)
+
+### 🎨 Drag-Drop Organizational Chart
+
+**Access**: `/org/chart`
+
+The organizational chart now features:
+- **Drag-and-drop reordering** - Move org units by dragging
+- **Edit mode toggle** - Safe editing with visual indicators
+- **Inline actions** - Add, edit, delete units directly on the chart
+- **Visual tree structure** - Clear hierarchy with connectors
+- **Real-time refresh** - Updates immediately after changes
+
+**How to Use**:
+1. Navigate to `/org/chart`
+2. Click "Toggle Edit Mode" to enable editing
+3. Drag org units to reorder them
+4. Hover over a unit to see action buttons (+ add, ✏️ edit, 🗑️ delete)
+5. Click "Save" when done
+
+### 📋 Kanban Workflow Board
+
+**Access**: `/workflow/kanban`
+
+Manage document workflows visually:
+- **Drag cards between stages** - Move documents through workflow
+- **Flow note editor** - Add notes when moving documents
+- **Priority badges** - Visual priority indicators
+- **Due date tracking** - See upcoming deadlines
+- **Assignment indicators** - Know who's responsible
+
+**How to Use**:
+1. Navigate to `/workflow/kanban`
+2. Drag a document card from one column to another
+3. A confirmation modal appears
+4. Select assignee (if needed) and click "Move"
+5. Add flow notes in the editor that appears
+6. Notes are attached to the workflow history
+
+### ⚡ Auto-Reassignment on User Status Change
+
+When a user's status changes (resigned, terminated, MIA):
+- Their pending workflow tasks are automatically reassigned
+- Escalation follows org hierarchy: same position → unit head → parent unit → admin
+- All reassignments are logged for audit
+
+---
+
 ## Logging In
 
 ### Username and Password

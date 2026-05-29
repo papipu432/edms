@@ -2,6 +2,16 @@
 
 An intelligent Enterprise Document Management System (EDMS) powered by LLM technology. EDMS combines traditional document management capabilities with an AI-driven wiki that incrementally builds a structured knowledge base from ingested documents, following Andrej Karpathy's LLM Wiki pattern.
 
+**Production-Ready Features:**
+- ✅ Drag-drop organizational chart builder with auto-reassignment on user resignation/termination/MIA
+- ✅ Kanban-style workflow board with flow note editor
+- ✅ Ransomware early detection with quarantine
+- ✅ Airgap-ready with offline package generation
+- ✅ Anti-AI-injection protection (PromptGuard)
+- ✅ Airtight backup management with dual-key hierarchy
+- ✅ RBAC based on organizational structure
+- ✅ Scan-to-EDMS support (TWAIN/SANE)
+
 ## Key Capabilities
 
 ### Document Management
@@ -142,6 +152,7 @@ Default admin credentials: `admin` / `admin` (change immediately in production).
 | [API_COOKBOOK.md](API_COOKBOOK.md) | Copy-pasteable curl examples for every endpoint |
 | [HOWTO.md](HOWTO.md) | Step-by-step guides for common tasks |
 | [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md) | Deployment, monitoring, backup, incident response |
+| [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) | **NEW** Production deployment checklist, security hardening, HA setup, monitoring, DR procedures |
 | [SECURITY.md](SECURITY.md) | Authentication, encryption, RBAC, threat model |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues with symptoms, causes, and solutions |
 | [USER_GUIDE.md](USER_GUIDE.md) | End-user guide for document management |

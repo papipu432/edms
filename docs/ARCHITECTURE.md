@@ -132,6 +132,19 @@ The database contains the following table groups:
 | `org_user_assignments` | User-to-position assignments |
 | `org_user_grades` | User personal grade history |
 | `org_change_history` | Audit trail for org structure changes |
+| `users.status` | User employment status (active, resigned, terminated, mia, on_leave) |
+
+### Workflow & Kanban
+
+| Table | Purpose |
+|-------|---------|
+| `workflow_stages` | Configurable kanban columns/stages |
+| `document_workflow` | Kanban cards with stage, assignment, priority, due date |
+| `workflow_notes` | Flow notes attached to workflow moves |
+| `workflow_entries` | Workflow action history with from/to stage tracking |
+| `approval_chains` | Sequential/parallel approval chain definitions |
+| `approval_chain_steps` | Individual steps in approval chains |
+| `sla_tracking` | SLA status (on_time, at_risk, breached) with escalation |
 
 ### Security & Encryption
 
@@ -211,6 +224,8 @@ Each service encapsulates a domain of business logic:
 | `KMSProvider` | Pluggable key management (LocalFileKMS, VaultKMS, CosmianKMS) |
 | `BackupKEKManager` | Isolated backup key hierarchy management |
 | `SecurityMonitoring` | KMS rate limiting, external alert processing, monitoring status |
+| `AutoReassignmentService` | **NEW** Automatic task reassignment on user resignation/termination/MIA |
+| `ScannerService` | TWAIN/SANE scanner integration for scan-to-EDMS |
 
 ## API Layer Structure
 

@@ -798,3 +798,171 @@ await manager.create_notification(
 | `lifecycle_alert` | User | Expiry/review deadlines approaching |
 | `ransomware_alert` | Broadcast | Security threats (all users) |
 | `backup_status` | User | Backup job completion/failure |
+
+---
+
+## Adding New Workflow Stages
+
+To add custom workflow stages to the kanban board:
+
+### 1. Define Stage in Database
+
+```python
+from app.models.workflow import WorkflowStage
+
+# Create a new stage
+stage = WorkflowStage(
+    name="Legal Review",
+    order=3,  # Position in kanban columns
+    color="#FFA500",  # Visual indicator
+    description="Legal team review required",
+    is_active=True
+)
+db.add(stage)
+await db.commit()
+```
+
+### 2. Add Stage via API
+
+```bash
+POST /api/workflow/stages
+{
+  "name": "Compliance Check",
+  "order": 4,
+  "color": "#800080",
+  "description": "Compliance officer approval"
+}
+```
+
+### 3. Update Workflow Templates
+
+Modify default workflow templates to include new stages for specific document types.
+
+---
+
+## Implementing Auto-Reassignment Logic
+
+The auto-reassignment service (`app/services/auto_reassignment.py`) handles task reassignment when users leave:
+
+### Trigger Points
+
+```python
+# When updating user status
+@app.put("/api/users/{user_id}/status")
+async def update_user_status(user_id: int, status: UserStatus, ...):
+    user.status = status
+    user.status_changed_at = datetime.utcnow()
+    
+    if status in [UserStatus.resigned, UserStatus.terminated, UserStatus.mia]:
+        # Trigger auto-reassignment
+        await auto_reassign_service.reassign_tasks(db, user.id)
+```
+
+### Escalation Path Configuration
+
+```python
+ESCALATION_PATH = [
+    "same_position",      # Other users in same position
+    "position_head",      # Head of the position
+    "unit_head",          # Head of org unit
+    "parent_unit_head",   # Escalate up org tree
+    "system_admin"        # Final fallback
+]
+```
+
+### Customizing Reassignment Rules
+
+Edit `app/services/auto_reassignment.py` to:
+- Change escalation order
+- Add notification callbacks
+- Implement custom business logic per org unit
+
+---
+
+## Creating Drag-Drop UI Components
+
+EDMS uses vanilla JavaScript with HTML5 Drag and Drop API for org chart and kanban:
+
+### Org Chart Drag-Drop (`templates/org/chart.html`)
+
+```javascript
+// Make org units draggable
+document.querySelectorAll('.org-unit').forEach(unit => {
+    unit.draggable = true;
+    unit.addEventListener('dragstart', handleDragStart);
+    unit.addEventListener('dragover', handleDragOver);
+    unit.addEventListener('drop', handleDrop);
+});
+
+function handleDrop(e) {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const targetId = this.dataset.unitId;
+    
+    // Call API to update parent
+    fetch(`/api/org/units/${draggedId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ new_parent_id: targetId })
+    });
+}
+```
+
+### Kanban Board (`templates/workflow/kanban.html`)
+
+Uses similar pattern with additional features:
+- Confirmation modal on drop
+- Assignee selection
+- Flow note editor trigger
+
+### Best Practices
+
+1. **Visual Feedback**: Show drop zones with CSS highlights
+2. **Touch Support**: Add touch events for mobile
+3. **Accessibility**: Provide keyboard alternatives
+4. **Optimistic Updates**: Update UI immediately, rollback on error
+
+---
+
+## Testing Production Features
+
+### Auto-Reassignment Tests
+
+```python
+async def test_auto_reassignment_on_termination():
+    # Setup: Create user with pending tasks
+    user = create_test_user(status="active")
+    task = create_workflow_task(assignee=user)
+    
+    # Action: Change status to terminated
+    await update_user_status(user.id, UserStatus.terminated)
+    
+    # Assert: Task reassigned to unit head
+    await db.refresh(task)
+    assert task.assignee_id == user.org_unit.head_id
+    assert task.workflow_notes[0].content.contains("Auto-reassigned")
+```
+
+### Drag-Drop UI Tests (Playwright)
+
+```python
+async def test_org_chart_drag_drop(page):
+    await page.goto("/org/chart")
+    await page.click("#toggle-edit-mode")
+    
+    # Drag unit A to unit B
+    unit_a = page.locator('[data-unit-id="1"]')
+    unit_b = page.locator('[data-unit-id="2"]')
+    
+    await unit_a.drag_to(unit_b)
+    
+    # Verify API call was made
+    async with page.expect_response("**/api/org/units/*/move"):
+        pass
+    
+    # Verify visual update
+    assert await unit_b.locator(".child-units").contains(unit_a)
+```
+
+---
+
+*Last Updated: See repository commit history*
