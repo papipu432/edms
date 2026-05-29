@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Anti-AI Injection Attack (Prompt Injection Protection) - Input sanitization layer for all user content going to LLMs, with detection logging and content boundary markers",
+  "status": "completed",
+  "steps": [
+    "Create app/services/prompt_guard.py with: (a) A PromptGuard class containing regex patterns to detect common prompt injection attempts: 'ignore previous instructions', 'system:' embedded in content, role-switching attempts ('as an AI', 'you are now'), delimiter injection (triple backticks, XML tags trying to escape context), instruction override patterns ('new instructions:', 'override:', 'forget everything'). (b) A sanitize(text: str) -> tuple[str, list[str]] method that returns (sanitized_text, list_of_detected_patterns). Sanitization should neutralize dangerous patterns by escaping/removing them but NOT block the document. (c) A wrap_user_content(text: str) -> str method that wraps user content in XML boundary markers like <user_content>...</user_content> to prevent context breakout. (d) Detection severity levels (low, medium, high) based on pattern type.",
+    "Create app/middleware/prompt_injection.py with: (a) A dependency/utility function sanitize_for_llm(text: str, source: str) that uses PromptGuard to sanitize text and logs any detected injection attempts as SecurityAlert records (using the existing SecurityAlert model from app/models/security.py). (b) The source parameter identifies where the input came from (filename, document_content, search_query, chat_message, annotation). (c) Detected attempts are logged with severity and source context.",
+    "Update app/core/llm.py to: (a) Import and use sanitize_for_llm before passing user content to LLM calls in generate_summary(), extract_keywords(), chat_completion(), extract_entities_topics(), merge_content(). (b) Wrap user-provided content in XML boundary markers in all prompt templates. (c) Add system prompt prefixes that instruct the LLM to treat content within <user_content> tags as data only, not instructions.",
+    "Update app/services/pipeline.py to sanitize document content before it reaches LLM calls (summary generation, keyword extraction, wiki ingest).",
+    "Update app/api/chat.py to sanitize chat messages before they reach the RAG system.",
+    "Update app/api/annotations.py to sanitize annotation text if it could reach LLM processing.",
+    "Create tests/test_prompt_guard.py with tests for: (a) Known injection patterns are detected and neutralized. (b) Legitimate content passes through without modification. (c) Boundary markers are correctly applied. (d) Detection is logged as SecurityAlert. (e) Multiple injection patterns in same input are all detected. (f) Sanitization does not destroy document content - only neutralizes dangerous parts.",
+    "Ensure all 481 existing tests still pass after sanitization integration."
+  ],
+  "acceptance_criteria": [
+    "PromptGuard detects and neutralizes common prompt injection patterns",
+    "Sanitized content still preserves the meaning of legitimate text",
+    "All LLM calls in the system use sanitized input with boundary markers",
+    "Detected injection attempts are logged as SecurityAlert entries",
+    "Content boundary markers prevent LLM from treating user content as instructions",
+    "All existing 481 tests continue to pass",
+    "New tests in test_prompt_guard.py all pass"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": "Implementation placed prompt_injection.py in app/services/ (not app/middleware/) to match existing project structure where services live. The feature description mentioned app/middleware/prompt_injection.py but the delegation prompt specified app/services/prompt_injection.py which aligns with the project conventions. Used sync PromptGuard in llm.py since those functions are synchronous. The async sanitize_for_llm is used in chat.py where db session is available. Annotations endpoint does not currently pass text to any LLM function so no changes were made there - only chat messages are sanitized at the API layer. All 534 tests pass (496 original + 38 new prompt guard tests)."
+}

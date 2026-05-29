@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Grades - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Grade Levels</h1>
+<div id="grades-list" class="bg-white rounded shadow p-4">
+    <p class="text-gray-500">Loading...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+authFetch('/org/api/grades').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('grades-list');
+    if(!data.length){el.innerHTML='<p>No grades found.</p>';return;}
+    el.innerHTML='<table class="w-full"><thead><tr><th class="text-left p-2">Code</th><th class="text-left p-2">Name</th><th class="text-left p-2">Level</th><th class="text-left p-2">Category</th></tr></thead><tbody>'+data.map(g=>'<tr><td class="p-2">'+escapeHtml(g.grade_code)+'</td><td class="p-2">'+escapeHtml(g.grade_name)+'</td><td class="p-2">'+g.grade_level+'</td><td class="p-2">'+escapeHtml(g.grade_category||'')+'</td></tr>').join('')+'</tbody></table>';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+name: Deploy
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: Add deployment steps
+      # Options:
+      # - docker push to registry
+      # - SSH deploy to server
+      # - kubectl apply to k8s cluster
+      - name: Placeholder
+        run: echo "Deployment pipeline - configure for your infrastructure"

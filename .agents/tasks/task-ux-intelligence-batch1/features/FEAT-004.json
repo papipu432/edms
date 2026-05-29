@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Document Intelligence pipeline integration: LLM auto-tagging on upload, form field extraction, and citation graph auto-detection. Extend the existing pipeline in app/services/pipeline.py.",
+  "status": "completed",
+  "steps": [
+    "1. Create app/services/auto_tagger.py: Service that takes document markdown content and uses LLM (via app/core/llm.py chat_completion) to generate 3-5 relevant tags. Returns list of tag name strings. Use a system prompt like 'Extract 3-5 concise topic tags from this document. Return only tag names, one per line.'",
+    "2. Create app/services/form_extractor.py: Service that takes markdown content and an optional extraction_prompt (from template). Uses LLM to extract key-value pairs (e.g., invoice number, date, amount, parties). Returns dict. Default prompt: 'Extract all key-value pairs, form fields, and structured data from this document as JSON.' If template has extraction_prompt, use that instead.",
+    "3. Create app/services/citation_detector.py: Service that takes document markdown content and list of all document names/IDs from DB. Uses LLM to identify which other documents are referenced/cited. Returns list of (source_doc_id, target_doc_id, 'cites') tuples. Prompt: 'Given this document content and the following list of known documents, identify which documents are cited or referenced. Return document IDs only.'",
+    "4. Update app/services/pipeline.py process_document method: After existing keyword extraction, add three new steps: (a) Auto-tag: call auto_tagger, create Tag records if they don't exist, create DocumentTag associations. (b) Form extraction: if document has a template with extraction_prompt, or always try default extraction, store result in document.extracted_fields. (c) Citation detection: call citation_detector with list of known doc names, create DocumentRelationship records with type='cites'. Wrap each in try/except so failures don't break the pipeline (log warnings like existing preview step).",
+    "5. Update the Document model query in pipeline to load extracted_fields properly (it's already a JSON column from FEAT-001)."
+  ],
+  "acceptance_criteria": [
+    "Pipeline processes documents and auto-generates tags (stored in DB)",
+    "Pipeline extracts structured fields and stores in document.extracted_fields",
+    "Pipeline detects citations and creates 'cites' relationships",
+    "Each new pipeline step is wrapped in try/except (non-critical failures don't break processing)",
+    "All existing tests pass (pipeline tests may need adjustment if they check exact flow)"
+  ],
+  "verification": [
+    "uv run pytest tests/ -x -q",
+    "uv run pytest tests/test_pipeline.py -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": "All 669 tests pass. Pipeline integration uses try/except for all three new steps so failures are non-critical. The new services use get_chat_model() directly (same pattern as generate_summary/extract_keywords) rather than the RAG-oriented chat_completion function. LLM model returns None when no API key is configured, so all new steps gracefully return empty results in test environments."
+}

@@ -1,0 +1,45 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Add Jinja2-rendered HTML frontend pages for document workflow: login, dashboard, document viewer with annotations, review/approval workflow, cross-referenced document viewing, and user/role management (admin).",
+  "status": "completed",
+  "steps": [
+    "Add dependency via 'uv add': jinja2. Run 'uv sync'.",
+    "Create app/templates/ directory structure: app/templates/base.html (base template with nav, CSS via Tailwind CDN, common JS), app/templates/login.html, app/templates/dashboard.html, app/templates/document_viewer.html, app/templates/workflow.html, app/templates/crossref.html, app/templates/admin_users.html.",
+    "Create app/templates/base.html: HTML5 base template with Tailwind CSS CDN, navigation bar (links to dashboard, workflow, admin if admin role), footer, flash messages area, block content placeholder. Include HTMX CDN for dynamic interactions.",
+    "Create app/templates/login.html: Login form (username, password), registration link. Form posts to /api/auth/login, stores JWT in localStorage, redirects to dashboard on success.",
+    "Create app/templates/dashboard.html: Shows documents organized by group/folder. Left sidebar with folder tree navigation. Main area shows document cards (filename, status, summary preview, upload date). Upload button per folder. Filter by status (uploaded/processing/processed/failed). Requires authentication.",
+    "Create app/templates/document_viewer.html: Full document viewer page. Left panel: rendered markdown content. Right panel: annotation sidebar (add/view annotations with text selection). Bottom: metadata (keywords, summary, processing status). Annotation form submits to an annotation API endpoint.",
+    "Create app/templates/workflow.html: Review/approval workflow page. Shows documents pending review in a queue. Each document has actions: Submit for Review (editor), Approve (approver), Reject with comments (reviewer), Request Changes (reviewer). Status badges showing workflow state. Filter by workflow status.",
+    "Create app/templates/crossref.html: Cross-referenced document viewer. Shows a document with its related/linked documents (from wiki entities/topics). Sidebar lists documents that share entities or topics with the current document. Click to navigate between related documents. Uses the wiki service to find cross-references.",
+    "Create app/templates/admin_users.html: Admin-only user management page. Table of users with their roles. Forms to assign/remove roles. Folder assignment management. Create new user form.",
+    "Create app/api/pages.py: HTML page route handler using Jinja2Templates. Routes: GET / (redirect to login or dashboard), GET /login (login page), GET /dashboard (dashboard page), GET /documents/{id}/view (document viewer), GET /workflow (workflow page), GET /documents/{id}/crossref (cross-ref viewer), GET /admin/users (admin user management). Mount static files if needed.",
+    "Create app/models/annotation.py: Annotation model (id, document_id FK, user_id FK, text, start_offset, end_offset, created_at). Create app/models/workflow.py: WorkflowAction model (id, document_id FK, user_id FK, action enum [submit_review, approve, reject, request_changes], comment, created_at).",
+    "Create app/api/annotations.py: POST /api/documents/{id}/annotations (create annotation), GET /api/documents/{id}/annotations (list annotations). Create app/api/workflow.py: POST /api/documents/{id}/workflow/submit (submit for review), POST /api/documents/{id}/workflow/approve, POST /api/documents/{id}/workflow/reject, GET /api/documents/{id}/workflow/history.",
+    "Create app/schemas/annotation.py and app/schemas/workflow.py with Pydantic models for request/response.",
+    "Update app/api/router.py to include pages_router, annotations_router, workflow_router.",
+    "Update app/main.py to mount Jinja2Templates directory.",
+    "Create tests/test_pages.py: Test that page routes return 200 with HTML content type. Test login page renders form. Test dashboard requires auth (redirects without token). Test admin page requires admin role.",
+    "Create tests/test_workflow.py: Test submit for review changes document workflow status. Test approve/reject actions. Test workflow history endpoint returns action log."
+  ],
+  "acceptance_criteria": [
+    "GET /login returns an HTML page with login form",
+    "GET /dashboard returns HTML page showing documents (requires auth)",
+    "GET /documents/{id}/view shows document content with annotation UI",
+    "GET /workflow shows review queue with action buttons",
+    "GET /documents/{id}/crossref shows related documents from wiki",
+    "GET /admin/users shows user management (admin only)",
+    "Annotation API allows creating and listing annotations on documents",
+    "Workflow API supports submit/approve/reject actions with role checks",
+    "All templates extend base.html and use Tailwind CSS",
+    "All existing tests pass plus new page/workflow tests pass",
+    "Running 'uv run ruff check app/ tests/' passes"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": "Used Starlette 1.1.0 TemplateResponse API with request as first positional arg (not in context dict). All 167 tests pass (146 existing + 21 new). Jinja2 3.1.6 installed."
+}

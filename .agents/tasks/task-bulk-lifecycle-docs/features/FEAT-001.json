@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Bulk Document Operations - API endpoints and service for batch upload, approval, signoff, and other bulk actions. Includes auto-folder creation when uploading documents to non-existent folder paths.",
+  "status": "completed",
+  "steps": [
+    "Create app/schemas/bulk.py with Pydantic schemas: BulkUploadResponse (list of uploaded doc results with success/error per file), BulkActionRequest (document_ids: list[int], action: str, comment: optional str), BulkActionResponse (results per document with success/error), AutoFolderUploadRequest (folder_path: str to specify nested group hierarchy like 'Finance/2024/Reports').",
+    "Create app/services/bulk.py with BulkService class containing: (a) bulk_upload method that accepts multiple UploadFile objects with a group_id or folder_path, creates groups/subgroups as needed if folder_path is provided, saves files via StorageService, creates Document records, kicks off pipeline for each; (b) bulk_workflow_action method that applies a WorkflowAction to multiple document_ids in a single call (validates permissions once, processes all documents, returns per-doc results); (c) auto_create_folder_hierarchy method that takes a path like 'Finance/2024/Reports' and creates missing Group records for each segment, returning the leaf group_id.",
+    "Create app/api/bulk.py with APIRouter (prefix='/api/bulk', tags=['bulk']): (a) POST /api/bulk/upload - accepts multiple files + group_id or folder_path query param, requires auth with editor/admin role; (b) POST /api/bulk/workflow - accepts BulkActionRequest (document_ids + action), requires auth with appropriate role per action; (c) POST /api/bulk/approve - shorthand for bulk approve; (d) POST /api/bulk/signoff - shorthand for bulk signoff (adds a new 'sign_off' action to WorkflowAction enum).",
+    "Update app/models/workflow.py to add 'sign_off' to WorkflowAction enum.",
+    "Update app/api/workflow.py _ACTION_ALLOWED_ROLES to include sign_off: ['approver', 'admin'].",
+    "Update app/models/group.py Group model to add optional parent_id field (Integer, ForeignKey to groups.id, nullable=True) to support nested folder hierarchy. Add a 'parent' relationship and 'children' relationship.",
+    "Register the bulk router in app/api/router.py by importing from app.api.bulk and adding api_router.include_router(bulk_router).",
+    "Update app/models/__init__.py to export any new models if added.",
+    "Create tests/test_bulk.py with comprehensive tests: test bulk upload of multiple files, test bulk upload with auto-folder creation (folder_path='A/B/C' creates groups), test bulk approve multiple documents, test bulk signoff, test permission enforcement on bulk actions, test partial failure handling (some docs not found), test that auto-folder creation is idempotent (uploading to same path twice reuses existing groups)."
+  ],
+  "acceptance_criteria": [
+    "POST /api/bulk/upload with multiple files creates all documents and returns per-file status",
+    "POST /api/bulk/upload with folder_path='Finance/2024/Reports' automatically creates nested Group hierarchy if it does not exist",
+    "POST /api/bulk/workflow with action='approve' and document_ids applies approval to all specified documents",
+    "POST /api/bulk/signoff applies sign_off workflow action to all specified documents",
+    "Proper RBAC enforcement - only users with appropriate roles can perform bulk actions",
+    "Partial failures are reported per-document without failing the entire batch",
+    "All new tests pass: uv run pytest tests/test_bulk.py -v"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/test_bulk.py -v",
+    "uv run pytest tests/ -v (all tests still pass including existing 268)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 277 tests pass (268 existing + 9 new). The bulk upload endpoint references doc_module.storage_service and doc_module.pipeline_db_url via module attribute access (not import-time binding) so test overrides work correctly. Added parent_id to Group model with self-referential relationship for folder hierarchy."
+}

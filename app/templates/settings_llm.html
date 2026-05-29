@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}LLM Settings - EDMS{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">LLM Settings</h1>
+
+    <!-- Connection Status -->
+    <div id="connection-status" class="mb-6 p-4 bg-gray-50 rounded-lg border">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-700">Ollama Connection Status</span>
+            <button onclick="checkStatus()" class="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
+                Check Connection
+            </button>
+        </div>
+        <div id="status-indicator" class="mt-2 text-sm text-gray-500">Click to check connection...</div>
+    </div>
+
+    <!-- Provider Selection -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">LLM Provider</h2>
+        <div class="flex items-center space-x-6">
+            <label class="flex items-center">
+                <input type="radio" name="llm_provider" value="openai" id="provider-openai" class="mr-2">
+                <span class="text-gray-700">OpenAI (Cloud)</span>
+            </label>
+            <label class="flex items-center">
+                <input type="radio" name="llm_provider" value="ollama" id="provider-ollama" class="mr-2">
+                <span class="text-gray-700">Ollama (Local)</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Ollama Configuration -->
+    <div id="ollama-config" class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Ollama Configuration</h2>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Endpoint URL</label>
+            <input type="text" id="ollama-url" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                   placeholder="http://localhost:11434">
+        </div>
+    </div>
+
+    <!-- Models Table -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Available Models</h2>
+            <button onclick="refreshModels()" class="text-sm bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
+                Refresh Models
+            </button>
+        </div>
+        <div id="models-table" class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Modified</th>
+                    </tr>
+                </thead>
+                <tbody id="models-body" class="divide-y divide-gray-200">
+                    <tr><td colspan="3" class="px-4 py-4 text-sm text-gray-500">Click Refresh to load models</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pull Model -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Pull Model</h2>
+        <div class="flex items-center space-x-3">
+            <input type="text" id="pull-model-name" class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                   placeholder="e.g., llama3.2, nomic-embed-text">
+            <button onclick="pullModel()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 text-sm">
+                Pull Model
+            </button>
+        </div>
+        <div id="pull-status" class="mt-2 text-sm text-gray-500"></div>
+    </div>
+
+    <!-- Model Assignments -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Model Assignments</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Summarization</label>
+                <select id="model-summarize" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="">-- Select Model --</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Keywords</label>
+                <select id="model-keywords" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="">-- Select Model --</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Embeddings</label>
+                <select id="model-embeddings" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="">-- Select Model --</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Chat / RAG</label>
+                <select id="model-chat" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="">-- Select Model --</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="flex justify-end">
+        <button onclick="saveConfig()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">
+            Save Configuration
+        </button>
+    </div>
+    <div id="save-status" class="mt-3 text-sm text-right"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load current config on page load
+    document.addEventListener('DOMContentLoaded', loadConfig);
+
+    function loadConfig() {
+        authFetch('/api/settings/llm')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('ollama-url').value = data.ollama_base_url || '';
+                if (data.llm_provider === 'ollama') {
+                    document.getElementById('provider-ollama').checked = true;
+                } else {
+                    document.getElementById('provider-openai').checked = true;
+                }
+                // Store model assignments to set after models load
+                window._savedConfig = data;
+            });
+    }
+
+    function checkStatus() {
+        const indicator = document.getElementById('status-indicator');
+        indicator.textContent = 'Checking...';
+        authFetch('/api/settings/llm/status')
+            .then(r => r.json())
+            .then(data => {
+                if (data.connected) {
+                    indicator.innerHTML = '<span class="text-green-600 font-medium">Connected</span> to ' + escapeHtml(data.url);
+                } else {
+                    indicator.innerHTML = '<span class="text-red-600 font-medium">Disconnected</span> - ' + escapeHtml(data.error || 'Unknown error');
+                }
+            })
+            .catch(() => {
+                indicator.innerHTML = '<span class="text-red-600 font-medium">Error</span> checking connection';
+            });
+    }
+
+    function refreshModels() {
+        const tbody = document.getElementById('models-body');
+        tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-sm text-gray-500">Loading...</td></tr>';
+        authFetch('/api/settings/llm/models')
+            .then(r => r.json())
+            .then(data => {
+                const models = data.models || [];
+                if (models.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-sm text-gray-500">No models found (is Ollama running?)</td></tr>';
+                    return;
+                }
+                let html = '';
+                const selectOptions = '<option value="">-- Select Model --</option>' +
+                    models.map(m => '<option value="' + escapeHtml(m.name) + '">' + escapeHtml(m.name) + '</option>').join('');
+
+                models.forEach(m => {
+                    const size = m.size ? (m.size / 1024 / 1024 / 1024).toFixed(1) + ' GB' : 'N/A';
+                    const modified = m.modified_at || 'N/A';
+                    html += '<tr>';
+                    html += '<td class="px-4 py-2 text-sm text-gray-900">' + escapeHtml(m.name) + '</td>';
+                    html += '<td class="px-4 py-2 text-sm text-gray-500">' + escapeHtml(size) + '</td>';
+                    html += '<td class="px-4 py-2 text-sm text-gray-500">' + escapeHtml(modified) + '</td>';
+                    html += '</tr>';
+                });
+                tbody.innerHTML = html;
+
+                // Update model dropdowns
+                document.getElementById('model-summarize').innerHTML = selectOptions;
+                document.getElementById('model-keywords').innerHTML = selectOptions;
+                document.getElementById('model-embeddings').innerHTML = selectOptions;
+                document.getElementById('model-chat').innerHTML = selectOptions;
+
+                // Restore saved selections
+                if (window._savedConfig) {
+                    document.getElementById('model-summarize').value = window._savedConfig.ollama_model_summarize || '';
+                    document.getElementById('model-keywords').value = window._savedConfig.ollama_model_keywords || '';
+                    document.getElementById('model-embeddings').value = window._savedConfig.ollama_model_embeddings || '';
+                    document.getElementById('model-chat').value = window._savedConfig.ollama_model_chat || '';
+                }
+            })
+            .catch(() => {
+                tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-sm text-red-500">Error loading models</td></tr>';
+            });
+    }
+
+    function pullModel() {
+        const nameInput = document.getElementById('pull-model-name');
+        const statusDiv = document.getElementById('pull-status');
+        const modelName = nameInput.value.trim();
+        if (!modelName) {
+            statusDiv.innerHTML = '<span class="text-red-500">Please enter a model name</span>';
+            return;
+        }
+        statusDiv.innerHTML = '<span class="text-blue-500">Pulling ' + escapeHtml(modelName) + '... (this may take a while)</span>';
+        authFetch('/api/settings/llm/pull', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({model: modelName})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                statusDiv.innerHTML = '<span class="text-green-600">Successfully pulled ' + escapeHtml(modelName) + '</span>';
+                refreshModels();
+            } else {
+                statusDiv.innerHTML = '<span class="text-red-500">Error: ' + escapeHtml(data.detail || 'Unknown error') + '</span>';
+            }
+        })
+        .catch(() => {
+            statusDiv.innerHTML = '<span class="text-red-500">Failed to pull model</span>';
+        });
+    }
+
+    function saveConfig() {
+        const statusDiv = document.getElementById('save-status');
+        const provider = document.querySelector('input[name="llm_provider"]:checked');
+        const config = {
+            llm_provider: provider ? provider.value : 'openai',
+            ollama_base_url: document.getElementById('ollama-url').value,
+            ollama_model_summarize: document.getElementById('model-summarize').value,
+            ollama_model_keywords: document.getElementById('model-keywords').value,
+            ollama_model_embeddings: document.getElementById('model-embeddings').value,
+            ollama_model_chat: document.getElementById('model-chat').value
+        };
+        authFetch('/api/settings/llm', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                statusDiv.innerHTML = '<span class="text-green-600">Configuration saved successfully</span>';
+            } else {
+                statusDiv.innerHTML = '<span class="text-red-500">Error: ' + escapeHtml(data.detail || 'Unknown error') + '</span>';
+            }
+        })
+        .catch(() => {
+            statusDiv.innerHTML = '<span class="text-red-500">Failed to save configuration</span>';
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Search & Knowledge features: Natural language queries, Knowledge graph visualization, Comparative analysis, and OCR confidence scoring",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Natural Language Search: Create app/schemas/natural_search.py with NaturalSearchRequest (query: str) and NaturalSearchResponse (interpreted_query: dict with fields group_id, lifecycle_state, date_from, date_to, keywords, file_type; results: list of FacetedSearchResult; raw_query: str; parse_method: str). Create app/services/natural_search.py with NaturalSearchService class that: (a) uses PromptGuard to sanitize input, (b) calls LLM (using get_chat_model() from app/core/llm.py) with a system prompt asking it to parse user query into JSON with fields {group_id, lifecycle_state, date_from, date_to, keywords, file_type}, (c) parses LLM JSON response into a FacetedSearchRequest, (d) calls EnhancedSearchService.faceted_search() with the structured query, (e) if LLM parsing fails or returns invalid JSON, falls back to vector search using VectorDBService. Add POST /api/search/natural endpoint in app/api/search.py that accepts NaturalSearchRequest and returns NaturalSearchResponse. Requires get_current_user authentication.",
+    "Step 2 - Knowledge Graph Visualization: Create app/schemas/knowledge_graph.py with KnowledgeGraphRequest (filters: document_id optional, group_id optional, entity optional str, relationship_type optional str) and KnowledgeGraphResponse (nodes: list of KGNode with id, label, type (document/entity/topic/group), metadata dict; edges: list of KGEdge with source, target, type, label). Create app/services/knowledge_graph.py with KnowledgeGraphService class that queries DocumentRelationship, Document, Group tables and builds a graph with: document nodes (from documents table), group nodes, entity/topic nodes (extracted from document keywords JSON field), and edges from document_relationships table plus inferred edges (document->group membership, document->entity/topic based on keywords). Add GET /api/knowledge-graph endpoint in a new app/api/knowledge_graph.py with query params: document_id, group_id, entity, relationship_type. Also add GET /api/knowledge-graph/view that returns an HTML page (app/templates/knowledge_graph.html) using vis.js Network via CDN (https://unpkg.com/vis-network/standalone/umd/vis-network.min.js) that fetches graph data from the API and renders an interactive force-directed graph. Support filtering controls in the HTML page. Register router in app/api/router.py.",
+    "Step 3 - Comparative Analysis: Add POST /api/documents/analyze/compare endpoint in app/api/compare.py. Request body schema (in app/schemas/comparison.py): ComparativeAnalysisRequest with document_ids (list[int], min 2 max 10) and question (str). Response schema: ComparativeAnalysisResponse with analysis (str, markdown formatted), documents_analyzed (list of doc IDs), question (str). Implementation: load markdown content for each document (using _read_markdown pattern already in compare.py), concatenate with document labels, sanitize via PromptGuard, call LLM with system prompt asking for structured comparison covering similarities, differences, contradictions, and evolution over time. Return markdown-formatted analysis. If LLM unavailable, return a basic difflib-based comparison summary.",
+    "Step 4 - OCR Confidence Scoring: Add ocr_confidence (Float, nullable=True) column to Document model in app/models/document.py. In app/services/converter.py, modify the convert_image method (which uses pytesseract) to use pytesseract.image_to_data(output_type=pytesseract.Output.DATAFRAME) instead of image_to_string() to get per-word confidence scores. Calculate average confidence and store in ConversionResult.metadata['ocr_confidence']. In app/services/pipeline.py, after conversion, read metadata['ocr_confidence'] and set document.ocr_confidence. Create app/schemas/ocr_quality.py with OCRQualityResponse (document_id, ocr_confidence, needs_review: bool based on < 70 threshold, page_confidences optional list). Add GET /api/documents/{id}/ocr-quality endpoint in app/api/documents.py that returns OCR quality info. Documents with confidence < 70% should have needs_review=True. Flag in list views: add ocr_confidence to document list/detail schemas if not already present."
+  ],
+  "acceptance_criteria": [
+    "POST /api/search/natural accepts {\"query\": \"Show me contracts from last month\"} and returns interpreted query params + search results",
+    "Natural language search falls back to vector search if LLM parsing fails",
+    "GET /api/knowledge-graph returns nodes and edges in proper format",
+    "GET /api/knowledge-graph/view returns an HTML page with vis.js interactive graph",
+    "POST /api/documents/analyze/compare accepts document IDs and question, returns markdown analysis",
+    "Document model has ocr_confidence field",
+    "GET /api/documents/{id}/ocr-quality returns confidence score and needs_review flag",
+    "All new endpoints require authentication",
+    "All user inputs to LLM are sanitized via PromptGuard"
+  ],
+  "verification": [
+    "uv run python -m pytest tests/test_natural_search.py -x -q",
+    "uv run python -m pytest tests/test_knowledge_graph.py -x -q",
+    "uv run python -m pytest tests/test_comparative_analysis.py -x -q",
+    "uv run python -m pytest tests/test_ocr_confidence.py -x -q",
+    "uv run python -m pytest tests/ -x -q (all tests pass)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 4 steps implemented successfully. 772 tests pass (29 new tests added). Mock paths for LLM need to reference app.services.natural_search.get_chat_model for the service and app.api.compare.get_chat_model for the compare endpoint. generate_embeddings must be patched at app.core.llm.generate_embeddings since it is imported inside the fallback method."
+}

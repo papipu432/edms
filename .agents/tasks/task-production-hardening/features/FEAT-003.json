@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Health check endpoints, Prometheus metrics with middleware, structured logging with structlog, and GitHub Actions CI/CD pipeline.",
+  "status": "completed",
+  "steps": [
+    "Add structlog, prometheus-client to pyproject.toml dependencies and run uv sync.",
+    "Create app/core/logging.py that configures structlog: JSON output when LOG_FORMAT=json (production), colored console output when LOG_FORMAT=text (dev). Include processors for: timestamping (ISO8601), log level, add request_id from contextvars, filter sensitive keys (password, token, secret, key, authorization - replace values with '***'). Export a setup_logging() function called from app/main.py lifespan.",
+    "Create a context variable for request_id in app/core/logging.py (using contextvars.ContextVar). Update app/middleware/error_handler.py RequestIDMiddleware to set this context var so all log entries within a request include request_id automatically.",
+    "Create app/api/health.py with three endpoints: GET /health (liveness - always returns {status: 'ok'}), GET /health/ready (readiness - checks DB connection via SELECT 1, checks Redis ping if REDIS_URL configured, returns {status: 'ok', checks: {...}}), GET /metrics (returns Prometheus metrics in text/plain format using generate_latest()).",
+    "Create app/middleware/metrics.py with PrometheusMiddleware (BaseHTTPMiddleware) that tracks: http_requests_total (Counter with method, endpoint, status labels), http_request_duration_seconds (Histogram with method, endpoint labels), http_active_requests (Gauge). Also define application-level metrics: document_processing_duration_seconds (Histogram), celery_tasks_total (Counter with task_name, status labels), documents_total (Gauge), users_total (Gauge), storage_bytes_used (Gauge).",
+    "Register the PrometheusMiddleware in app/main.py (add before RateLimiterMiddleware). Register the health router in app/api/router.py. Call setup_logging() in the lifespan startup.",
+    "Create .github/workflows/ci.yml: trigger on push to main and PRs. Jobs: lint (runs ruff check app/ tests/), test (python 3.11, uv install, pytest with SQLite, upload test results artifact), build (docker build -t edms:ci ., only on main branch), security (pip install safety, run safety check or pip-audit). Use actions/setup-python, cache uv dependencies with actions/cache keyed on uv.lock hash.",
+    "Create .github/workflows/deploy.yml as a placeholder/template: trigger on workflow_dispatch and push to main (after CI passes). Include commented deployment steps for docker push to registry, ssh deploy, or k8s apply."
+  ],
+  "acceptance_criteria": [
+    "GET /health returns 200 with {status: 'ok'} without authentication",
+    "GET /health/ready checks database connectivity and returns status for each dependency",
+    "GET /metrics returns Prometheus-format text with request_count, request_duration_seconds metrics",
+    "PrometheusMiddleware tracks all requests automatically",
+    "structlog is configured and outputs JSON when LOG_FORMAT=json",
+    "Sensitive fields (password, token, secret, key) are filtered from logs",
+    "Request ID from X-Request-ID middleware appears in all log entries for that request",
+    ".github/workflows/ci.yml exists with lint, test, build, security jobs",
+    ".github/workflows/deploy.yml exists as deployment template",
+    "uv run ruff check app/ passes",
+    "uv run pytest tests/ -x -q passes"
+  ],
+  "verification": [
+    "Run 'uv sync' to install new deps (structlog, prometheus-client)",
+    "Run 'uv run ruff check app/' to confirm no lint errors",
+    "Run 'uv run pytest tests/ -x -q' to confirm all tests pass",
+    "Run 'uv run python -c \"from app.core.logging import setup_logging; setup_logging()\"' to verify logging config loads"
+  ],
+  "blocked_reason": null,
+  "findings": "All new files pass ruff lint checks. 937 tests pass (excluding the pre-existing flaky test_chat_enhanced.py::TestUnauthorizedAccess::test_cannot_access_other_users_session which fails due to rate limiter state leakage in the full suite). structlog and prometheus-client installed successfully. setup_logging() verified to load correctly."
+}

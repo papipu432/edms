@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Tags & Smart Folders - EDMS{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold">Tags & Smart Folders</h1>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Tags Management -->
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold mb-4">Tags</h2>
+            <!-- Create Tag Form -->
+            <form id="create-tag-form" class="flex gap-2 mb-4">
+                <input type="text" id="tag-name" placeholder="Tag name" required class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm">
+                <input type="color" id="tag-color" value="#3B82F6" class="w-10 h-10 rounded border border-gray-300 cursor-pointer">
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">Create Tag</button>
+            </form>
+            <!-- Tags List -->
+            <div id="tags-list" class="flex flex-wrap gap-2 mb-6">
+                <p class="text-sm text-gray-500">Loading tags...</p>
+            </div>
+
+            <hr class="my-6">
+
+            <!-- Bulk Tagging Section -->
+            <h3 class="font-semibold mb-3">Assign Tags to Documents</h3>
+            <div class="flex gap-2 mb-3">
+                <select id="bulk-tag-select" class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="">Select a tag...</option>
+                </select>
+                <button onclick="bulkAssignTag()" class="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700">Assign to Selected</button>
+            </div>
+            <div id="documents-for-tagging" class="space-y-2 max-h-64 overflow-y-auto">
+                <p class="text-sm text-gray-500">Loading documents...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Folders -->
+    <div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold mb-4">Smart Folders</h2>
+            <div id="smart-folders-list" class="space-y-2 mb-4">
+                <p class="text-sm text-gray-500">Loading...</p>
+            </div>
+            <hr class="my-4">
+            <h3 class="font-semibold mb-3 text-sm">Create Smart Folder</h3>
+            <form id="create-smart-folder-form" class="space-y-3">
+                <input type="text" id="sf-name" placeholder="Folder name" required class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                <textarea id="sf-description" placeholder="Description (optional)" rows="2" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></textarea>
+                <div class="space-y-2">
+                    <label class="text-xs font-medium text-gray-600">Query Filters</label>
+                    <select id="sf-status" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Any status</option>
+                        <option value="uploaded">Uploaded</option>
+                        <option value="processing">Processing</option>
+                        <option value="processed">Processed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <input type="text" id="sf-keyword" placeholder="Keyword filter" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <input type="date" id="sf-date-from" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="From date">
+                    <input type="date" id="sf-date-to" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="To date">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md text-sm hover:bg-blue-700">Create Smart Folder</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let allTags = [];
+let selectedDocIds = new Set();
+
+async function loadTags() {
+    const resp = await authFetch('/api/tags');
+    if (!resp.ok) return;
+    allTags = await resp.json();
+    renderTags();
+    renderTagSelect();
+}
+
+function renderTags() {
+    const container = document.getElementById('tags-list');
+    if (allTags.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">No tags yet. Create one above.</p>';
+        return;
+    }
+    container.innerHTML = allTags.map(tag => `
+        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm text-white" style="background-color: ${escapeHtml(tag.color || '#3B82F6')}">
+            ${escapeHtml(tag.name)}
+            <button onclick="deleteTag(${tag.id})" class="ml-1 hover:text-red-200 text-xs font-bold">&times;</button>
+        </span>
+    `).join('');
+}
+
+function renderTagSelect() {
+    const select = document.getElementById('bulk-tag-select');
+    select.innerHTML = '<option value="">Select a tag...</option>' +
+        allTags.map(t => '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>').join('');
+}
+
+document.getElementById('create-tag-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('tag-name').value.trim();
+    const color = document.getElementById('tag-color').value;
+    if (!name) return;
+    const resp = await authFetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color })
+    });
+    if (resp.ok) {
+        document.getElementById('tag-name').value = '';
+        loadTags();
+    }
+});
+
+async function deleteTag(tagId) {
+    if (!confirm('Delete this tag?')) return;
+    await authFetch('/api/tags/' + tagId, { method: 'DELETE' });
+    loadTags();
+}
+
+async function loadDocumentsForTagging() {
+    const resp = await authFetch('/api/documents');
+    if (!resp.ok) return;
+    const docs = await resp.json();
+    const container = document.getElementById('documents-for-tagging');
+    if (docs.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">No documents.</p>';
+        return;
+    }
+    container.innerHTML = docs.map(d => `
+        <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox" value="${d.id}" onchange="toggleDocSelection(${d.id}, this.checked)" class="rounded border-gray-300">
+            <span class="text-sm truncate">${escapeHtml(d.original_filename)}</span>
+        </label>
+    `).join('');
+}
+
+function toggleDocSelection(docId, checked) {
+    if (checked) selectedDocIds.add(docId);
+    else selectedDocIds.delete(docId);
+}
+
+async function bulkAssignTag() {
+    const tagId = document.getElementById('bulk-tag-select').value;
+    if (!tagId) { alert('Please select a tag'); return; }
+    if (selectedDocIds.size === 0) { alert('Please select documents'); return; }
+    for (const docId of selectedDocIds) {
+        await authFetch('/api/documents/' + docId + '/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag_id: parseInt(tagId) })
+        });
+    }
+    alert('Tags assigned successfully');
+    selectedDocIds.clear();
+}
+
+// Smart Folders
+async function loadSmartFolders() {
+    const resp = await authFetch('/api/smart-folders');
+    if (!resp.ok) return;
+    const folders = await resp.json();
+    const container = document.getElementById('smart-folders-list');
+    if (folders.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">No smart folders yet.</p>';
+        return;
+    }
+    container.innerHTML = folders.map(f => `
+        <div class="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+            <div>
+                <p class="text-sm font-medium">${escapeHtml(f.name)}</p>
+                ${f.description ? '<p class="text-xs text-gray-500">' + escapeHtml(f.description) + '</p>' : ''}
+            </div>
+            <button onclick="deleteSmartFolder(${f.id})" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
+        </div>
+    `).join('');
+}
+
+async function deleteSmartFolder(id) {
+    if (!confirm('Delete this smart folder?')) return;
+    await authFetch('/api/smart-folders/' + id, { method: 'DELETE' });
+    loadSmartFolders();
+}
+
+document.getElementById('create-smart-folder-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('sf-name').value.trim();
+    if (!name) return;
+    const query_json = {};
+    const status = document.getElementById('sf-status').value;
+    if (status) query_json.status = status;
+    const keyword = document.getElementById('sf-keyword').value.trim();
+    if (keyword) query_json.keyword = keyword;
+    const dateFrom = document.getElementById('sf-date-from').value;
+    if (dateFrom) query_json.date_from = dateFrom;
+    const dateTo = document.getElementById('sf-date-to').value;
+    if (dateTo) query_json.date_to = dateTo;
+
+    const resp = await authFetch('/api/smart-folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name,
+            description: document.getElementById('sf-description').value.trim() || null,
+            query_json
+        })
+    });
+    if (resp.ok) {
+        document.getElementById('sf-name').value = '';
+        document.getElementById('sf-description').value = '';
+        document.getElementById('sf-status').value = '';
+        document.getElementById('sf-keyword').value = '';
+        document.getElementById('sf-date-from').value = '';
+        document.getElementById('sf-date-to').value = '';
+        loadSmartFolders();
+    }
+});
+
+loadTags();
+loadDocumentsForTagging();
+loadSmartFolders();
+</script>
+{% endblock %}

@@ -1,0 +1,42 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "E-signature integration, delegation/proxy, SLA tracking, and workflow builder UI. This feature adds: (1) Digital signature system with SHA-256 hash, QR code generation, verification endpoint, and optional X.509 certificate signing. (2) Delegation model allowing users to delegate approval authority for a time period with scope. (3) SLA policy tracking per folder/template with on_time/at_risk/breached states and auto-escalation notifications. (4) Workflow builder HTML page for admins to visually configure approval chains using htmx.",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Create app/models/signature.py with: DocumentSignature (id int PK, document_id FK to documents.id CASCADE, signer_id str FK to users.id, signature_hash str unique index, qr_code_path str nullable, signed_at datetime, certificate_data text nullable, verification_url str nullable, is_valid bool default True).",
+    "Step 2 - Create app/models/delegation.py with: Delegation (id int PK, delegator_id str FK to users.id CASCADE, delegate_id str FK to users.id CASCADE, start_date datetime, end_date datetime, scope_type enum 'all'/'folder', scope_folder_id int FK nullable to groups.id, is_active bool default True, created_at datetime).",
+    "Step 3 - Create app/models/sla.py with: SLAPolicy (id int PK, folder_id int FK nullable to groups.id, template_id int FK nullable to document_templates.id, action str default 'approval', max_duration_hours int not null, escalation_role str nullable, is_active bool default True, created_at datetime). DocumentSLA (id int PK, document_id FK to documents.id CASCADE, policy_id FK to sla_policies.id, started_at datetime, deadline_at datetime, status enum 'on_time'/'at_risk'/'breached'/'completed', completed_at datetime nullable, escalated bool default False).",
+    "Step 4 - Create app/schemas/signature.py with: SignDocumentRequest (certificate_pem optional str), SignatureResponse (id, document_id, signer_id, signature_hash, qr_code_path, signed_at, certificate_data nullable, verification_url, is_valid), VerifyResponse (valid bool, document_id, signer_username, signed_at).",
+    "Step 5 - Create app/schemas/delegation.py with: DelegationCreate (delegate_id str, start_date datetime, end_date datetime, scope_type str default 'all', scope_folder_id int optional), DelegationResponse (id, delegator_id, delegator_username, delegate_id, delegate_username, start_date, end_date, scope_type, scope_folder_id, is_active, created_at).",
+    "Step 6 - Create app/schemas/sla.py with: SLAPolicyCreate (folder_id optional, template_id optional, action str, max_duration_hours int, escalation_role optional), SLAPolicyResponse, DocumentSLAResponse (id, document_id, policy_id, started_at, deadline_at, status, completed_at, escalated, percent_elapsed float), SLADashboardResponse (total int, on_time int, at_risk int, breached int, completed int, compliance_rate float).",
+    "Step 7 - Create app/services/signature_service.py with: generate_signature(document_id, content_bytes, user_id, timestamp) -> signature_hash using SHA-256 of content+user_id+timestamp. generate_qr_code(verification_url, output_path) using qrcode library. verify_signature(hash) -> lookup in DB. sign_with_certificate(content_bytes, cert_pem) -> use cryptography library to sign with X.509 private key if provided.",
+    "Step 8 - Create app/api/signatures.py with: POST /api/documents/{document_id}/sign (sign document - reads document content from storage, generates hash, creates QR code, stores signature), GET /api/signatures/verify/{hash} (public endpoint, no auth - verifies signature exists and is valid), GET /api/documents/{document_id}/signatures (list all signatures for document).",
+    "Step 9 - Create app/api/delegations.py with: POST /api/delegations (create delegation, auth required), GET /api/delegations (list active delegations for current user as delegator or delegate), DELETE /api/delegations/{id} (revoke - only delegator or admin), GET /api/delegations/active-for/{user_id} (check if user has active delegation - used internally by approval system).",
+    "Step 10 - Create app/api/sla.py with: POST /api/sla-policies (create SLA policy, admin only), GET /api/sla-policies (list policies), DELETE /api/sla-policies/{id} (admin only). POST /api/documents/{document_id}/sla/start (start SLA tracking - finds matching policy, creates DocumentSLA with deadline). GET /api/documents/{document_id}/sla (get SLA status for document). GET /api/sla/dashboard (SLA compliance metrics - total, on_time, at_risk, breached counts and compliance rate). PUT /api/sla/check-breaches (cron-like endpoint to check all active SLAs, update statuses: >80% elapsed = at_risk, >100% = breached, notify escalation_role on breach).",
+    "Step 11 - Register new routers in app/api/router.py: signatures, delegations, sla.",
+    "Step 12 - Create app/templates/workflow_builder.html extending base.html: admin page to configure approval chains. Show form with chain name, folder/template selector, and a dynamic step list. Each step row has: step_order (auto), role/user selector, type (sequential/parallel) dropdown, timeout_hours input, remove button. 'Add Step' button uses htmx hx-get to fetch a new step row partial. Save button POSTs to /api/approval-chains. List existing chains with edit/delete.",
+    "Step 13 - Add page route in app/api/pages.py: GET /workflow-builder -> render workflow_builder.html template.",
+    "Step 14 - Create tests/test_signatures.py testing: sign document, verify signature hash (public endpoint), list signatures for document, invalid hash returns not-found/invalid.",
+    "Step 15 - Create tests/test_delegations.py testing: create delegation, list delegations, revoke delegation, expired delegation not returned as active.",
+    "Step 16 - Create tests/test_sla.py testing: create SLA policy, start SLA for document, check SLA status (on_time), check-breaches endpoint updates at_risk/breached, SLA dashboard returns correct counts.",
+    "Step 17 - Run uv run pytest tests/test_signatures.py tests/test_delegations.py tests/test_sla.py -v to verify all new tests pass.",
+    "Step 18 - Run full test suite: uv run pytest tests/ -q --tb=short to confirm no regressions."
+  ],
+  "acceptance_criteria": [
+    "Running uv run pytest tests/test_signatures.py -v passes all signature tests",
+    "Running uv run pytest tests/test_delegations.py -v passes all delegation tests",
+    "Running uv run pytest tests/test_sla.py -v passes all SLA tests",
+    "The /api/signatures/verify/{hash} endpoint works without authentication",
+    "QR code generation produces a file path stored in the signature record",
+    "SLA dashboard returns compliance metrics",
+    "All 697+ existing tests continue to pass",
+    "Workflow builder page renders at /workflow-builder"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -q --tb=short"
+  ],
+  "blocked_reason": null,
+  "findings": "All 18 new tests pass. Full suite passes at 740 tests (up from 722 baseline). QR code generation works with the qrcode library. The /api/signatures/verify/{hash} endpoint works without authentication. Workflow builder page renders at /workflow-builder."
+}

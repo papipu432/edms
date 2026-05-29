@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-007",
+  "type": "feat",
+  "description": "Security Monitoring Layer - Configuration generators/templates for auditd, falco, suricata/zeek; KMS unwrap rate limiting with audit; integration service for monitoring alerts into EDMS notifications; status API endpoint",
+  "status": "completed",
+  "steps": [
+    "Create app/services/security_monitoring.py with a SecurityMonitoringService class: (a) A KMSRateLimiter inner class that tracks unwrap_key calls per IP using a sliding window (configurable max_calls_per_minute=10, window=60s). When exceeded: logs SecurityAlert, raises KMSRateLimitError exception. (b) wrap the KMS unwrap_key operation with rate limiting. (c) A MonitoringAlertProcessor that can receive alerts from external tools (auditd, falco, suricata) via a webhook endpoint or polling interface and converts them to EDMS SecurityAlert/Notification records. (d) get_monitoring_status() - returns dict with status of each monitoring layer (configured/active/error/disabled).",
+    "Create app/services/security_configs.py with configuration generator functions: (a) generate_auditd_rules(data_dir: str) -> str - generates auditd rules file content: auditctl -w {data_dir} -p wa -k dms_data, with rules for monitoring renames and deletes. (b) generate_falco_rules() -> str - generates a YAML falco rules file that alerts on unexpected child processes from DMS workers. (c) generate_suricata_rules() -> str - generates suricata rules for detecting C2 beacons and unusual outbound traffic. (d) generate_kms_audit_config() -> str - generates config for KMS audit logging (alert on unwrap_key >10/min).",
+    "Create app/templates/security/ directory with template files: auditd_rules.conf.j2, falco_rules.yaml.j2, suricata.rules.j2 - Jinja2 templates for each monitoring tool's configuration, parameterized with data_dir, worker_process_names, allowed_outbound_ips.",
+    "Update app/api/security.py to add new endpoints: (a) GET /api/security/monitoring/status - returns current status of all monitoring layers (file_integrity, process_monitoring, kms_audit, network). (b) POST /api/security/monitoring/alerts/ingest - webhook endpoint to receive alerts from external monitoring tools (auditd, falco, suricata). Validates alert format, creates SecurityAlert, sends notification via NotificationManager. (c) GET /api/security/monitoring/configs/{tool} - returns generated configuration for specified tool (auditd, falco, suricata). (d) GET /api/security/kms/rate-limit-status - returns current KMS rate limit status (calls in window, limit, blocked IPs).",
+    "Update app/services/kms.py to wrap unwrap_key with rate limit checking. Add a module-level function rate_limited_unwrap(wrapped_blob, client_ip) that checks rate limit before calling the provider's unwrap_key. Log all unwrap calls to audit.",
+    "Update app/core/config.py to add settings: KMS_RATE_LIMIT_MAX_CALLS: int = 10, KMS_RATE_LIMIT_WINDOW_SECONDS: int = 60, SECURITY_MONITORING_WEBHOOK_SECRET: str = '' (for authenticating incoming alerts).",
+    "Create tests/test_security_monitoring.py with tests for: (a) KMS rate limiter blocks after exceeding threshold. (b) Alert ingest endpoint creates SecurityAlert. (c) Config generation produces valid config content for each tool. (d) Monitoring status endpoint returns all layers. (e) Rate limit audit logs are created on block."
+  ],
+  "acceptance_criteria": [
+    "Configuration templates are generated for auditd, falco, and suricata with correct rules",
+    "KMS unwrap operations are rate-limited per IP (default 10/min)",
+    "Exceeding KMS rate limit creates a SecurityAlert and blocks further calls",
+    "External monitoring tools can send alerts to EDMS via webhook endpoint",
+    "GET /api/security/monitoring/status shows status of all 4 monitoring layers",
+    "All existing tests continue to pass",
+    "New tests in test_security_monitoring.py all pass"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": "All 618 tests pass (26 new + 592 existing). No issues encountered. The rate_limited_unwrap function uses lazy imports to avoid circular dependencies. The webhook secret validation is optional (empty string means no validation). The singleton KMS rate limiter is initialized from config settings on first access."
+}

@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Document Lifetime and Lifecycle - Add lifetime/expiry tracking, recurring lifecycle state machine (Draft -> Review -> Approved -> UpToDate -> NeedsReview or Expired), and email notification service for approaching deadlines.",
+  "status": "completed",
+  "steps": [
+    "Create app/models/lifecycle.py with: (a) DocumentLifecycleState enum: draft, in_review, approved, up_to_date, needs_re_review, expired; (b) LifecycleType enum: permanent (no expiry, no recurring review), expiring (has end_of_life date but no recurring review), recurring (has lifecycle_interval_days for periodic re-review cycle); (c) DocumentLifecycle model (table 'document_lifecycles'): id (int PK), document_id (FK to documents.id, unique), lifecycle_type (LifecycleType enum), state (DocumentLifecycleState enum, default=draft), expires_at (DateTime nullable - the end-of-life date), review_interval_days (Integer nullable - days between recurring reviews), next_review_at (DateTime nullable - when next review is due), last_reviewed_at (DateTime nullable), last_approved_at (DateTime nullable), assigned_reviewer_id (FK to users.id nullable), created_at, updated_at; (d) LifecycleTransition model (table 'lifecycle_transitions'): id (int PK), lifecycle_id (FK), from_state, to_state, transitioned_by (FK to users.id), comment (Text nullable), created_at - audit trail of all state changes.",
+    "Create app/schemas/lifecycle.py with Pydantic schemas: DocumentLifecycleCreate (lifecycle_type, expires_at optional, review_interval_days optional), DocumentLifecycleResponse (all fields), DocumentLifecycleUpdate (state, comment), LifecycleTransitionResponse, LifecycleAlertResponse (document info + days_until_expiry or days_until_review).",
+    "Create app/services/lifecycle.py with LifecycleService class: (a) create_lifecycle(document_id, lifecycle_type, expires_at, review_interval_days) - creates lifecycle record; (b) transition_state(lifecycle_id, new_state, user_id, comment) - validates state transition is legal (enforce state machine rules), creates LifecycleTransition record, updates lifecycle state, recalculates next_review_at if transitioning to up_to_date; (c) get_documents_needing_review() - query documents where next_review_at <= now; (d) get_expiring_documents(days_ahead=30) - query documents where expires_at is within days_ahead days; (e) _valid_transitions dict defining allowed state transitions: draft->[in_review], in_review->[approved, draft], approved->[up_to_date], up_to_date->[needs_re_review, expired], needs_re_review->[in_review, expired].",
+    "Create app/services/email_notifications.py with EmailNotificationService class: (a) send_lifecycle_alert(user_email, document_name, alert_type, days_remaining) - sends email notification (using smtplib or logs to console if SMTP not configured); (b) check_and_send_alerts() - queries documents approaching expiry or review date, finds assigned RBAC users for each document's group (via FolderAssignment), sends alerts; (c) Configuration via Settings: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL, ALERT_DAYS_BEFORE_EXPIRY (default 30), ALERT_DAYS_BEFORE_REVIEW (default 14).",
+    "Add SMTP settings to app/core/config.py: SMTP_HOST (default ''), SMTP_PORT (default 587), SMTP_USER (default ''), SMTP_PASSWORD (default ''), SMTP_FROM_EMAIL (default 'edms@example.com'), ALERT_DAYS_BEFORE_EXPIRY (default 30), ALERT_DAYS_BEFORE_REVIEW (default 14).",
+    "Create app/api/lifecycle.py with APIRouter (prefix='/api/lifecycle', tags=['lifecycle']): (a) POST /api/documents/{document_id}/lifecycle - create lifecycle for a document (requires editor/admin); (b) GET /api/documents/{document_id}/lifecycle - get lifecycle info; (c) POST /api/documents/{document_id}/lifecycle/transition - transition state (requires appropriate role based on target state); (d) GET /api/lifecycle/alerts - list documents needing attention (approaching expiry or review); (e) POST /api/lifecycle/check-alerts - trigger alert check and send notifications (admin only); (f) GET /api/documents/{document_id}/lifecycle/history - get transition history.",
+    "Register the lifecycle router in app/api/router.py.",
+    "Update app/models/__init__.py to export DocumentLifecycle, LifecycleTransition, DocumentLifecycleState, LifecycleType.",
+    "Create tests/test_lifecycle.py with comprehensive tests: test create lifecycle (permanent, expiring, recurring), test valid state transitions (full cycle: draft->in_review->approved->up_to_date->needs_re_review->in_review), test invalid state transitions are rejected, test get expiring documents, test get documents needing review, test transition history audit trail, test email notification service check_and_send_alerts (mock SMTP), test that recurring lifecycle auto-calculates next_review_at."
+  ],
+  "acceptance_criteria": [
+    "DocumentLifecycle model stores lifecycle_type, state, expires_at, review_interval_days, next_review_at",
+    "State machine enforces valid transitions only: draft->in_review->approved->up_to_date->needs_re_review (cycle) or ->expired",
+    "Invalid state transitions return 400 error with clear message",
+    "LifecycleTransition audit trail records every state change with user and timestamp",
+    "GET /api/lifecycle/alerts returns documents approaching expiry or review deadline",
+    "EmailNotificationService sends alerts for documents within configured threshold days",
+    "Recurring lifecycles auto-calculate next_review_at = last_approved_at + review_interval_days",
+    "All new tests pass: uv run pytest tests/test_lifecycle.py -v"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/test_lifecycle.py -v",
+    "uv run pytest tests/ -v (all tests still pass)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 292 tests pass (277 existing + 15 new lifecycle tests). Fixed timezone-aware vs naive datetime comparison in get_alerts method for SQLite compatibility. The lifecycle state machine enforces valid transitions: draft->in_review->approved->up_to_date->needs_re_review (cycle) or ->expired. SMTP settings added to config with sensible defaults (empty host means no emails sent, just logging)."
+}

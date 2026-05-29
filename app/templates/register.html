@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Register - EDMS{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto mt-16">
+    <div class="bg-white p-8 rounded-lg shadow">
+        <h1 class="text-2xl font-bold mb-6 text-center">Create Account</h1>
+        <div id="error-msg" class="hidden bg-red-100 text-red-700 p-3 rounded mb-4"></div>
+        <div id="success-msg" class="hidden bg-green-100 text-green-700 p-3 rounded mb-4"></div>
+        <form id="register-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Username</label>
+                <input type="text" name="username" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" name="email" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Password</label>
+                <input type="password" name="password" required class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">Register</button>
+        </form>
+        <p class="mt-4 text-center text-sm text-gray-600">
+            Already have an account? <a href="/login" class="text-blue-600 hover:underline">Login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        username: form.username.value,
+        email: form.email.value,
+        password: form.password.value
+    };
+    const resp = await fetch('/api/auth/register', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+    });
+    if (resp.ok) {
+        const msg = document.getElementById('success-msg');
+        msg.textContent = 'Account created! Redirecting to login...';
+        msg.classList.remove('hidden');
+        document.getElementById('error-msg').classList.add('hidden');
+        setTimeout(() => { window.location.href = '/login'; }, 1500);
+    } else {
+        const result = await resp.json();
+        const err = document.getElementById('error-msg');
+        err.textContent = result.detail || 'Registration failed';
+        err.classList.remove('hidden');
+    }
+});
+</script>
+{% endblock %}

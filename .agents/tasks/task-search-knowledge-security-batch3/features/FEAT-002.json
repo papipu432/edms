@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Security & Compliance features: Compliance reporting, Geo-fencing middleware, and Watermarking",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Compliance Reporting: Create app/models/compliance.py with ComplianceReport model (id, report_type enum: access_log/encryption_status/retention_compliance/permission_audit, generated_by, generated_at, start_date, end_date, report_data JSON, format: json/csv). Create app/schemas/compliance.py with ComplianceReportRequest (report_type, start_date, end_date, format: str default 'json') and ComplianceReportResponse (report_id, report_type, generated_at, data: dict, export_url optional). Create app/services/compliance.py with ComplianceReportService that generates each report type: (a) access_log_report - queries DocumentAuditLog for date range, groups by user and document; (b) encryption_status - queries documents + EncryptionKey for encryption status summary; (c) retention_compliance - queries DocumentLifecycle for docs past retention or properly archived; (d) permission_audit - queries User, UserRole, RolePermission for who has access to what. Create app/api/compliance.py with POST /api/compliance/reports (generate report), GET /api/compliance/reports (list reports), GET /api/compliance/reports/{id} (get specific report), GET /api/compliance/reports/{id}/export?format=csv (CSV export). Register in router.py. Require admin role.",
+    "Step 2 - Geo-fencing: Create app/models/geofence.py with GeoFenceRule model (id, scope enum: global/group/document, scope_id optional int for group/document, allowed_ip_ranges JSON list of CIDR strings, allowed_countries JSON list of country codes, denied_ip_ranges JSON list, denied_countries JSON list, action enum: allow/deny, enabled bool default True, created_at, updated_at). Create app/services/geofence.py with GeoFenceService that: (a) checks IP against CIDR ranges using ipaddress module from stdlib, (b) does country lookup using a simple internal mapping or header-based approach (X-Country-Code header for flexibility - no external geoip dependency needed for testability), (c) evaluates rules in order: document-specific > group-specific > global. Create app/middleware/geofence.py extending BaseHTTPMiddleware that: checks if geo-fencing is enabled (via settings.GEO_FENCE_ENABLED default False), if enabled loads rules and checks request IP. Denied requests get 403 with security event logged via SecurityAlert model. Add GEO_FENCE_ENABLED setting to config.py. Create app/api/geofence.py with CRUD endpoints: GET /api/geofence/rules, POST /api/geofence/rules, PUT /api/geofence/rules/{id}, DELETE /api/geofence/rules/{id}. Require admin role. Register router and middleware in main.py (middleware only added if enabled).",
+    "Step 3 - Watermarking: Create app/models/watermark.py with WatermarkConfig model (id, group_id FK nullable for group-specific or null for global, text_template str default '{user} - {timestamp} - {doc_id} - CONFIDENTIAL', opacity float default 0.3, position str default 'diagonal', enabled bool default True, created_at). Create app/schemas/watermark.py with WatermarkConfigCreate, WatermarkConfigResponse, WatermarkApplyRequest. Create app/services/watermark.py with WatermarkService that: (a) for PDFs uses pikepdf + reportlab to overlay text watermark on each page, (b) for images uses Pillow to draw semi-transparent text overlay, (c) for preview HTML returns a CSS watermark overlay div. The text template supports variables: {user}, {timestamp}, {doc_id}, {custom_text}. Create app/api/watermark.py with: GET /api/watermark/configs (list configs), POST /api/watermark/configs (create config), PUT /api/watermark/configs/{id} (update), DELETE /api/watermark/configs/{id} (delete), POST /api/documents/{id}/watermarked (download watermarked copy). Register in router.py. Require authentication for download, admin for config management."
+  ],
+  "acceptance_criteria": [
+    "POST /api/compliance/reports generates reports for all 4 report types",
+    "GET /api/compliance/reports/{id}/export?format=csv returns CSV data",
+    "Geo-fence middleware is disabled by default and can be enabled via config",
+    "When enabled, geo-fence blocks requests from denied IPs with 403 and logs security events",
+    "CRUD API for geo-fence rules works correctly",
+    "WatermarkConfig model stores per-group watermark settings",
+    "POST /api/documents/{id}/watermarked returns a watermarked PDF/image",
+    "Watermark text template variables are correctly substituted",
+    "All admin endpoints require admin role"
+  ],
+  "verification": [
+    "uv run python -m pytest tests/test_compliance.py -x -q",
+    "uv run python -m pytest tests/test_geofence.py -x -q",
+    "uv run python -m pytest tests/test_watermark.py -x -q",
+    "uv run python -m pytest tests/ -x -q (all tests pass)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 836 tests pass (772 existing + 64 new). Used pikepdf+Pillow for PDF watermarking since reportlab is not available. Geo-fence middleware conditionally added in main.py only when GEO_FENCE_ENABLED=True. No external geoip dependency needed - uses X-Country-Code header approach."
+}

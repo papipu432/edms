@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .toolbar { margin-bottom: 15px; display: flex; gap: 10px; }
+        .toolbar button {
+            padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;
+            background: #4f46e5; color: #fff; cursor: pointer; border: none;
+        }
+        .toolbar button:hover { background: #4338ca; }
+        .toolbar input, .toolbar select {
+            padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        #canvas-area {
+            position: relative; width: 100%; height: 600px;
+            border: 1px solid #ccc; background: #fff; overflow: hidden;
+        }
+        .canvas-item {
+            position: absolute; border: 2px solid #333; border-radius: 4px;
+            padding: 8px; cursor: move; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            user-select: none; min-width: 100px; min-height: 50px;
+        }
+        .canvas-item:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        h1 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>Canvas</h1>
+    <div class="toolbar">
+        <select id="canvas-select">
+            <option value="">Select a canvas...</option>
+        </select>
+        <input type="text" id="canvas-name" placeholder="Canvas name" />
+        <button onclick="createCanvas()">New Canvas</button>
+        <button onclick="addNote()">Add Note</button>
+        <button onclick="savePositions()">Save</button>
+    </div>
+    <div id="canvas-area"></div>
+
+    <script>
+        let currentCanvasId = null;
+        let items = [];
+        let dragTarget = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        async function loadCanvases() {
+            const resp = await fetch('/api/canvas');
+            if (resp.ok) {
+                const canvases = await resp.json();
+                const sel = document.getElementById('canvas-select');
+                sel.innerHTML = '<option value="">Select a canvas...</option>';
+                canvases.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        async function createCanvas() {
+            const name = document.getElementById('canvas-name').value;
+            if (!name) return;
+            const resp = await fetch('/api/canvas', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name: name})
+            });
+            if (resp.ok) {
+                const canvas = await resp.json();
+                currentCanvasId = canvas.id;
+                await loadCanvases();
+                document.getElementById('canvas-select').value = canvas.id;
+                loadItems();
+            }
+        }
+
+        async function loadItems() {
+            if (!currentCanvasId) return;
+            const resp = await fetch('/api/canvas/' + currentCanvasId + '/items');
+            if (resp.ok) {
+                items = await resp.json();
+                renderItems();
+            }
+        }
+
+        function renderItems() {
+            const area = document.getElementById('canvas-area');
+            area.innerHTML = '';
+            items.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'canvas-item';
+                el.style.left = item.x_position + 'px';
+                el.style.top = item.y_position + 'px';
+                el.style.width = item.width + 'px';
+                el.style.height = item.height + 'px';
+                if (item.color) el.style.borderColor = item.color;
+                el.textContent = item.note_text || ('Doc #' + item.document_id);
+                el.dataset.itemId = item.id;
+
+                el.addEventListener('mousedown', startDrag);
+                area.appendChild(el);
+            });
+        }
+
+        function startDrag(e) {
+            dragTarget = e.target;
+            dragOffsetX = e.clientX - dragTarget.offsetLeft;
+            dragOffsetY = e.clientY - dragTarget.offsetTop;
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', endDrag);
+        }
+
+        function doDrag(e) {
+            if (!dragTarget) return;
+            dragTarget.style.left = (e.clientX - dragOffsetX) + 'px';
+            dragTarget.style.top = (e.clientY - dragOffsetY) + 'px';
+        }
+
+        function endDrag() {
+            dragTarget = null;
+            document.removeEventListener('mousemove', doDrag);
+            document.removeEventListener('mouseup', endDrag);
+        }
+
+        async function addNote() {
+            if (!currentCanvasId) { alert('Select or create a canvas first'); return; }
+            const text = prompt('Enter note text:');
+            if (!text) return;
+            const resp = await fetch('/api/canvas/' + currentCanvasId + '/items', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({note_text: text, x_position: 50, y_position: 50, width: 200, height: 100})
+            });
+            if (resp.ok) loadItems();
+        }
+
+        async function savePositions() {
+            const area = document.getElementById('canvas-area');
+            const els = area.querySelectorAll('.canvas-item');
+            for (const el of els) {
+                const itemId = el.dataset.itemId;
+                await fetch('/api/canvas/' + currentCanvasId + '/items/' + itemId, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        x_position: parseFloat(el.style.left),
+                        y_position: parseFloat(el.style.top)
+                    })
+                });
+            }
+        }
+
+        document.getElementById('canvas-select').addEventListener('change', function() {
+            currentCanvasId = this.value || null;
+            if (currentCanvasId) loadItems();
+        });
+
+        loadCanvases();
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+.venv
+.git
+__pycache__
+*.db
+tests/
+.ruff_cache
+.pytest_cache
+storage/
+uploads/
+wiki/
+chroma_db/
+data/
+.agents/

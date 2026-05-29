@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}LDAP Configuration - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">LDAP Configuration</h1>
+<div id="ldap-configs" class="bg-white rounded shadow p-4">
+    <p class="text-gray-500">Loading...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+authFetch('/ldap/api/configs').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('ldap-configs');
+    if(!data.length){el.innerHTML='<p>No LDAP configs. Add one to enable LDAP authentication.</p>';return;}
+    el.innerHTML='<table class="w-full"><thead><tr><th class="text-left p-2">Name</th><th class="text-left p-2">Server</th><th class="text-left p-2">Active</th><th class="text-left p-2">Default</th></tr></thead><tbody>'+data.map(c=>'<tr><td class="p-2">'+escapeHtml(c.name)+'</td><td class="p-2">'+escapeHtml(c.server_url)+':'+c.server_port+'</td><td class="p-2">'+(c.is_active?'Yes':'No')+'</td><td class="p-2">'+(c.is_default?'Yes':'No')+'</td></tr>').join('')+'</tbody></table>';
+});
+</script>
+{% endblock %}

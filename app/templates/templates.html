@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Templates - EDMS{% endblock %}
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <div>
+        <h1 class="text-2xl font-bold">Document Templates</h1>
+        <p class="text-sm text-gray-500 mt-1">Create and manage templates for standardized document creation.</p>
+    </div>
+    <button onclick="showCreateForm()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">New Template</button>
+</div>
+
+<!-- Template Create/Edit Form (hidden by default) -->
+<div id="template-form-container" class="hidden mb-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 id="form-title" class="text-lg font-semibold mb-4">Create Template</h2>
+        <form id="template-form" class="space-y-4">
+            <input type="hidden" id="template-id" value="">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input type="text" id="tpl-name" required class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea id="tpl-description" rows="2" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Required Fields (JSON key-value pairs)</label>
+                <div id="required-fields-builder" class="space-y-2 mb-2">
+                </div>
+                <button type="button" onclick="addRequiredField()" class="text-sm text-blue-600 hover:underline">+ Add Field</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Folder ID (optional)</label>
+                    <input type="number" id="tpl-folder-id" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Lifecycle Type (optional)</label>
+                    <select id="tpl-lifecycle" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">None</option>
+                        <option value="standard">Standard</option>
+                        <option value="policy">Policy</option>
+                        <option value="contract">Contract</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Extraction Prompt (optional)</label>
+                <textarea id="tpl-extraction-prompt" rows="3" placeholder="LLM prompt for extracting structured data from documents using this template..." class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></textarea>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">Save Template</button>
+                <button type="button" onclick="hideCreateForm()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-300">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Templates List -->
+<div id="templates-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <p class="text-gray-500">Loading templates...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let editingTemplateId = null;
+
+function showCreateForm() {
+    editingTemplateId = null;
+    document.getElementById('form-title').textContent = 'Create Template';
+    document.getElementById('template-id').value = '';
+    document.getElementById('tpl-name').value = '';
+    document.getElementById('tpl-description').value = '';
+    document.getElementById('tpl-folder-id').value = '';
+    document.getElementById('tpl-lifecycle').value = '';
+    document.getElementById('tpl-extraction-prompt').value = '';
+    document.getElementById('required-fields-builder').innerHTML = '';
+    document.getElementById('template-form-container').classList.remove('hidden');
+}
+
+function hideCreateForm() {
+    document.getElementById('template-form-container').classList.add('hidden');
+}
+
+function addRequiredField(key, value) {
+    const builder = document.getElementById('required-fields-builder');
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 items-center';
+    row.innerHTML = `
+        <input type="text" placeholder="Field name" value="${escapeHtml(key || '')}" class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm field-key">
+        <input type="text" placeholder="Field type (text, number, date)" value="${escapeHtml(value || 'text')}" class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm field-value">
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm">&times;</button>
+    `;
+    builder.appendChild(row);
+}
+
+function getRequiredFields() {
+    const fields = {};
+    document.querySelectorAll('#required-fields-builder > div').forEach(row => {
+        const key = row.querySelector('.field-key').value.trim();
+        const value = row.querySelector('.field-value').value.trim();
+        if (key) fields[key] = value || 'text';
+    });
+    return fields;
+}
+
+document.getElementById('template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+        name: document.getElementById('tpl-name').value.trim(),
+        description: document.getElementById('tpl-description').value.trim() || null,
+        required_fields: getRequiredFields(),
+        default_folder_id: document.getElementById('tpl-folder-id').value ? parseInt(document.getElementById('tpl-folder-id').value) : null,
+        default_lifecycle_type: document.getElementById('tpl-lifecycle').value || null,
+        extraction_prompt: document.getElementById('tpl-extraction-prompt').value.trim() || null
+    };
+
+    let resp;
+    if (editingTemplateId) {
+        resp = await authFetch('/api/templates/' + editingTemplateId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    } else {
+        resp = await authFetch('/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+    if (resp.ok) {
+        hideCreateForm();
+        loadTemplates();
+    }
+});
+
+async function loadTemplates() {
+    const resp = await authFetch('/api/templates');
+    if (!resp.ok) return;
+    const templates = await resp.json();
+    const grid = document.getElementById('templates-grid');
+    if (templates.length === 0) {
+        grid.innerHTML = '<p class="text-gray-500">No templates yet. Create one to get started.</p>';
+        return;
+    }
+    grid.innerHTML = templates.map(t => `
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-medium text-sm mb-1">${escapeHtml(t.name)}</h3>
+            <p class="text-xs text-gray-500 mb-3">${t.description ? escapeHtml(t.description) : 'No description'}</p>
+            <div class="text-xs text-gray-400 mb-3">
+                ${t.default_lifecycle_type ? '<span class="inline-block bg-gray-100 px-2 py-0.5 rounded mr-1">' + escapeHtml(t.default_lifecycle_type) + '</span>' : ''}
+                ${Object.keys(t.required_fields || {}).length ? '<span class="inline-block bg-gray-100 px-2 py-0.5 rounded">' + Object.keys(t.required_fields).length + ' fields</span>' : ''}
+            </div>
+            <div class="flex gap-2">
+                <button onclick="editTemplate(${t.id})" class="text-xs text-blue-600 hover:underline">Edit</button>
+                <button onclick="deleteTemplate(${t.id})" class="text-xs text-red-600 hover:underline">Delete</button>
+                <button onclick="createFromTemplate(${t.id})" class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 ml-auto">Create Document</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function editTemplate(id) {
+    const resp = await authFetch('/api/templates/' + id);
+    if (!resp.ok) return;
+    const t = await resp.json();
+    editingTemplateId = id;
+    document.getElementById('form-title').textContent = 'Edit Template';
+    document.getElementById('tpl-name').value = t.name || '';
+    document.getElementById('tpl-description').value = t.description || '';
+    document.getElementById('tpl-folder-id').value = t.default_folder_id || '';
+    document.getElementById('tpl-lifecycle').value = t.default_lifecycle_type || '';
+    document.getElementById('tpl-extraction-prompt').value = t.extraction_prompt || '';
+    const builder = document.getElementById('required-fields-builder');
+    builder.innerHTML = '';
+    if (t.required_fields) {
+        Object.entries(t.required_fields).forEach(([key, value]) => addRequiredField(key, value));
+    }
+    document.getElementById('template-form-container').classList.remove('hidden');
+}
+
+async function deleteTemplate(id) {
+    if (!confirm('Delete this template?')) return;
+    await authFetch('/api/templates/' + id, { method: 'DELETE' });
+    loadTemplates();
+}
+
+async function createFromTemplate(id) {
+    const resp = await authFetch('/api/templates/' + id + '/create-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    });
+    if (resp.ok) {
+        const data = await resp.json();
+        const fields = data.required_fields || {};
+        const fieldNames = Object.keys(fields);
+        if (fieldNames.length > 0) {
+            alert('Template "' + data.template_name + '" requires the following fields before creating a document: ' + fieldNames.join(', ') + '. Please upload a document to the folder and the template fields will be extracted automatically.');
+        } else {
+            alert('Template "' + data.template_name + '" is ready. Upload a document to the default folder to use this template.');
+        }
+    }
+}
+
+loadTemplates();
+</script>
+{% endblock %}

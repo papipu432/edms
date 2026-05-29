@@ -1,0 +1,14 @@
+{
+  "task_id": "task-edms-full-enhancements",
+  "task_description": "Comprehensive EDMS enhancements: security hardening (KMS abstraction, backup KEK isolation, raw key protection), first-time setup wizard (CLI + web), document relationship management, orphaned lifecycle monitoring dashboard, Obsidian vault export, enhanced search UX, improved chat with persistence, and real-time WebSocket notifications.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006", "FEAT-007", "FEAT-008"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "481 tests pass (297 original + 184 new). Ruff lint clean. Review issues addressed: auth added to Obsidian export, SQL wildcard injection fixed, notification endpoints return proper HTTP status codes, chat context windowed to 20 messages / 50k chars."
+  }
+}

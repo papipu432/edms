@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-006",
+  "type": "feat",
+  "description": "Enhanced Search UX - Full-text search across content + metadata, faceted search (by group, lifecycle state, date range, keywords, file type), search suggestions/autocomplete, search history for logged-in users, and related documents suggestions based on vector similarity.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Create app/models/search_history.py with SearchHistory model: id, user_id (FK), query_text, filters_json (stored facets used), results_count, searched_at. This persists search history per user.",
+    "Step 2: Create app/schemas/search_enhanced.py extending the existing search schemas with: FacetedSearchRequest(query, group_id, lifecycle_state, date_from, date_to, keywords, file_type, page, page_size), FacetedSearchResponse(results, facets: dict with available filter values and counts, total_count, page, page_size), SearchSuggestion(text, source: 'keyword'|'entity'|'document_name'), RelatedDocumentsResponse(document_id, related: list of {doc_id, doc_name, similarity_score}).",
+    "Step 3: Create app/services/search_enhanced.py with EnhancedSearchService class: faceted_search(db, request) -> applies SQL filters on documents table (group_id, file_type, date range, lifecycle state via join) combined with vector similarity search for semantic relevance. get_suggestions(db, partial_query) -> searches keywords JSON field, document names, and entity names for autocomplete matches. get_related_documents(doc_id, top_k) -> uses vector DB to find similar documents. save_search_history(db, user_id, query, filters, results_count). get_search_history(db, user_id, limit).",
+    "Step 4: Update app/api/search.py to add new endpoints: POST /api/search/faceted (faceted search with filters), GET /api/search/suggestions?q=<partial> (autocomplete suggestions), GET /api/documents/{id}/related (related documents by vector similarity), GET /api/search/history (user's search history), DELETE /api/search/history (clear search history).",
+    "Step 5: Create tests/test_search_enhanced.py with tests: faceted search filters by group, faceted search filters by date range, faceted search filters by file type, suggestions return matching keywords, related documents uses vector similarity, search history is saved and retrievable per user, history can be cleared."
+  ],
+  "acceptance_criteria": [
+    "Faceted search supports filtering by group, lifecycle state, date range, keywords, file type",
+    "Search suggestions return relevant autocomplete options from keywords and document names",
+    "Related documents endpoint returns similar documents ranked by vector similarity",
+    "Search history is persisted per user and retrievable",
+    "Tests pass: uv run pytest tests/test_search_enhanced.py -v"
+  ],
+  "verification": [
+    "uv run pytest tests/test_search_enhanced.py -v"
+  ],
+  "blocked_reason": null,
+  "findings": "All 12 new tests pass. All 446 total tests pass (including 434 pre-existing). Ruff lint clean. SQLite JSON field search uses LIKE on cast string for compatibility. Search history ordering uses set-based assertion instead of timestamp ordering due to SQLite sub-second resolution."
+}

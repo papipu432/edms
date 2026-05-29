@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Org Units - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Organization Units</h1>
+<div id="units-list" class="bg-white rounded shadow p-4">
+    <p class="text-gray-500">Loading...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+authFetch('/org/api/units').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('units-list');
+    if(!data.length){el.innerHTML='<p>No units found.</p>';return;}
+    el.innerHTML='<table class="w-full"><thead><tr><th class="text-left p-2">Code</th><th class="text-left p-2">Name</th><th class="text-left p-2">Active</th></tr></thead><tbody>'+data.map(u=>'<tr><td class="p-2">'+escapeHtml(u.code)+'</td><td class="p-2">'+escapeHtml(u.name)+'</td><td class="p-2">'+(u.is_active?'Yes':'No')+'</td></tr>').join('')+'</tbody></table>';
+});
+</script>
+{% endblock %}

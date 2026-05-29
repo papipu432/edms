@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}Workflow Kanban - EDMS{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Document Workflow Kanban</h1>
+    <div class="flex gap-2">
+        <select id="group-filter" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+            <option value="">All Groups</option>
+        </select>
+        <button onclick="refreshKanban()" class="bg-gray-200 px-3 py-2 rounded hover:bg-gray-300">
+            🔄 Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Kanban Board -->
+<div id="kanban-board" class="flex gap-4 overflow-x-auto pb-4">
+    <!-- Columns will be rendered here -->
+    <div class="text-gray-500">Loading kanban board...</div>
+</div>
+
+<!-- Move Document Modal -->
+<div id="move-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold mb-4">Move Document</h3>
+        <form id="move-form" onsubmit="handleMoveSubmit(event)">
+            <input type="hidden" id="move-document-id">
+            <input type="hidden" id="move-from-stage-id">
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">To Stage</label>
+                <select id="move-to-stage" class="w-full border border-gray-300 rounded-md px-3 py-2" required>
+                    <!-- Stages will be populated -->
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Assign To (optional)</label>
+                <select id="move-assign-user" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    <option value="">Unassigned</option>
+                    <!-- Users will be populated -->
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Comment/Note</label>
+                <textarea id="move-note" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2" 
+                          placeholder="Add a note about this move..."></textarea>
+            </div>
+            
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeMoveModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    Move
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.kanban-column {
+    min-width: 300px;
+    max-width: 300px;
+    background: #f3f4f6;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.kanban-header {
+    padding: 12px 16px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kanban-cards {
+    padding: 8px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 70vh;
+    min-height: 200px;
+}
+
+.kanban-card {
+    background: white;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: grab;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.kanban-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.kanban-column.drag-over {
+    background: #e0e7ff;
+}
+
+.card-title {
+    font-weight: 500;
+    margin-bottom: 8px;
+    word-break: break-word;
+}
+
+.card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.priority-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.priority-urgent { background: #fee2e2; color: #dc2626; }
+.priority-high { background: #fed7aa; color: #ea580c; }
+.priority-normal { background: #dbeafe; color: #2563eb; }
+.priority-low { background: #f3f4f6; color: #6b7280; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stages = [];
+let users = [];
+let draggedCard = null;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadStages();
+    loadUsers();
+    loadGroups();
+    refreshKanban();
+});
+
+async function loadStages() {
+    const resp = await authFetch('/api/workflow/stages');
+    if (!resp.ok) return;
+    stages = await resp.json();
+}
+
+async function loadUsers() {
+    const resp = await authFetch('/api/users');
+    if (!resp.ok) return;
+    users = await resp.json();
+    populateUserSelects();
+}
+
+async function loadGroups() {
+    const resp = await authFetch('/api/groups');
+    if (!resp.ok) return;
+    const groups = await resp.json();
+    const select = document.getElementById('group-filter');
+    select.innerHTML = '<option value="">All Groups</option>' + 
+        groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+    
+    select.addEventListener('change', () => refreshKanban());
+}
+
+async function refreshKanban() {
+    const groupId = document.getElementById('group-filter').value;
+    let url = '/api/workflow/kanban';
+    if (groupId) url += `?group_id=${groupId}`;
+    
+    const resp = await authFetch(url);
+    if (!resp.ok) {
+        document.getElementById('kanban-board').innerHTML = '<p class="text-red-500">Failed to load kanban</p>';
+        return;
+    }
+    
+    const data = await resp.json();
+    renderKanbanBoard(data.columns);
+}
+
+function renderKanbanBoard(columns) {
+    const board = document.getElementById('kanban-board');
+    
+    if (columns.length === 0) {
+        board.innerHTML = '<p class="text-gray-500">No workflow stages configured.</p>';
+        return;
+    }
+    
+    board.innerHTML = columns.map(col => `
+        <div class="kanban-column" 
+             data-stage-id="${col.stage_id}"
+             ondragover="handleColumnDragOver(event)"
+             ondragleave="handleColumnDragLeave(event)"
+             ondrop="handleCardDrop(event, ${col.stage_id})">
+            <div class="kanban-header" style="background-color: ${col.stage_color || '#e5e7eb'}; color: ${getContrastColor(col.stage_color)}">
+                <span>${escapeHtml(col.stage_name)}</span>
+                <span class="text-sm opacity-75">${col.cards.length}</span>
+            </div>
+            <div class="kanban-cards" id="cards-${col.stage_id}">
+                ${col.cards.length > 0 ? col.cards.map(card => renderCard(card)).join('') : '<p class="text-gray-400 text-sm p-2">No documents</p>'}
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderCard(card) {
+    return `
+        <div class="kanban-card" 
+             draggable="true"
+             data-card-id="${card.id}"
+             data-document-id="${card.document_id}"
+             ondragstart="handleCardDragStart(event)"
+             ondragend="handleCardDragEnd(event)"
+             onclick="showCardDetails(${card.document_id})">
+            <div class="card-title">${escapeHtml(card.title)}</div>
+            <div class="card-meta">
+                <span class="priority-badge priority-${card.priority}">${card.priority}</span>
+                ${card.due_date ? `<span>📅 ${formatDate(card.due_date)}</span>` : ''}
+            </div>
+            ${card.assigned_to_user_id ? `<div class="text-xs text-gray-500 mt-2">👤 Assigned</div>` : ''}
+        </div>
+    `;
+}
+
+// Drag and Drop handlers
+function handleCardDragStart(e) {
+    draggedCard = e.currentTarget;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+        cardId: e.currentTarget.dataset.cardId,
+        documentId: e.currentTarget.dataset.documentId,
+        fromStageId: e.currentTarget.closest('.kanban-column').dataset.stageId
+    }));
+}
+
+function handleCardDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        col.classList.remove('drag-over');
+    });
+    draggedCard = null;
+}
+
+function handleColumnDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('drag-over');
+}
+
+function handleColumnDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+async function handleCardDrop(e, toStageId) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const data = e.dataTransfer.getData('text/plain');
+    if (!data) return;
+    
+    const cardInfo = JSON.parse(data);
+    const fromStageId = parseInt(cardInfo.fromStageId);
+    
+    if (fromStageId === toStageId) return;
+    
+    openMoveModal(cardInfo.documentId, fromStageId, toStageId);
+}
+
+// Move Modal functions
+function openMoveModal(documentId, fromStageId, toStageId) {
+    document.getElementById('move-document-id').value = documentId;
+    
+    const stageSelect = document.getElementById('move-to-stage');
+    stageSelect.innerHTML = stages.map(s => 
+        `<option value="${s.id}" ${s.id === toStageId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+    ).join('');
+    
+    document.getElementById('move-modal').classList.remove('hidden');
+}
+
+function closeMoveModal() {
+    document.getElementById('move-modal').classList.add('hidden');
+    document.getElementById('move-form').reset();
+}
+
+async function handleMoveSubmit(e) {
+    e.preventDefault();
+    
+    const documentId = document.getElementById('move-document-id').value;
+    const toStageId = document.getElementById('move-to-stage').value;
+    const assignUserId = document.getElementById('move-assign-user').value;
+    const note = document.getElementById('move-note').value;
+    
+    const resp = await authFetch(`/api/workflow/documents/${documentId}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            to_stage_id: parseInt(toStageId),
+            assign_to_user_id: assignUserId || null,
+            comment: note,
+            note: note
+        })
+    });
+    
+    if (resp.ok) {
+        closeMoveModal();
+        refreshKanban();
+    } else {
+        alert('Failed to move document');
+    }
+}
+
+function populateUserSelects() {
+    const select = document.getElementById('move-assign-user');
+    select.innerHTML = '<option value="">Unassigned</option>' + 
+        users.map(u => `<option value="${u.id}">${escapeHtml(u.display_name || u.username)}</option>`).join('');
+}
+
+function getContrastColor(hexcolor) {
+    if (!hexcolor) return '#000000';
+    hexcolor = hexcolor.replace('#', '');
+    const r = parseInt(hexcolor.substr(0, 2), 16);
+    const g = parseInt(hexcolor.substr(2, 2), 16);
+    const b = parseInt(hexcolor.substr(4, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? '#000000' : '#ffffff';
+}
+
+function formatDate(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleDateString();
+}
+
+function showCardDetails(documentId) {
+    window.location.href = `/documents/${documentId}/view`;
+}
+</script>
+{% endblock %}

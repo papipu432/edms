@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - EDMS{% endblock %}
+{% block content %}
+<div id="breadcrumb-container" class="mb-4 hidden">
+    <nav class="flex text-sm text-gray-500" aria-label="Breadcrumb">
+        <ol id="breadcrumb-list" class="inline-flex items-center space-x-1"></ol>
+    </nav>
+</div>
+<div class="flex gap-6">
+    <!-- Sidebar: Groups -->
+    <div class="w-64 flex-shrink-0">
+        <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-4">Groups</h2>
+            <div id="groups-list" class="space-y-2">
+                <p class="text-sm text-gray-500">Loading...</p>
+            </div>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
+            <select id="status-filter" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                <option value="">All</option>
+                <option value="uploaded">Uploaded</option>
+                <option value="processing">Processing</option>
+                <option value="processed">Processed</option>
+                <option value="failed">Failed</option>
+            </select>
+        </div>
+    </div>
+    <!-- Main area: Documents -->
+    <div class="flex-1">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Documents</h1>
+            <button onclick="document.getElementById('upload-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Upload Document</button>
+            <input type="file" id="upload-input" class="hidden" onchange="uploadDocument(this)">
+        </div>
+        <div id="documents-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <p class="text-gray-500">Loading documents...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentGroup = null;
+
+async function loadGroups() {
+    const resp = await authFetch('/api/groups');
+    if (!resp.ok) return;
+    const groups = await resp.json();
+    const list = document.getElementById('groups-list');
+    if (groups.length === 0) {
+        list.innerHTML = '<p class="text-sm text-gray-500">No groups yet</p>';
+        return;
+    }
+    list.innerHTML = groups.map(g => `
+        <div class="group-card block w-full text-left px-3 py-2 rounded hover:bg-blue-50 text-sm border-2 border-transparent transition-colors cursor-pointer"
+             data-group-id="${g.id}"
+             onclick="selectGroup(${g.id})"
+             ondragover="handleGroupDragOver(event)"
+             ondragleave="handleGroupDragLeave(event)"
+             ondrop="handleGroupDrop(event, ${g.id})">
+            <span class="pointer-events-none">${escapeHtml(g.name)} <span class="text-gray-400">(${g.document_count || 0})</span></span>
+        </div>
+    `).join('');
+}
+
+function handleGroupDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('border-blue-400', 'bg-blue-50');
+}
+
+function handleGroupDragLeave(e) {
+    e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+}
+
+async function handleGroupDrop(e, groupId) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+    const files = e.dataTransfer.files;
+    if (!files.length) return;
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+    }
+    formData.append('group_id', groupId);
+
+    // Show upload indicator
+    const card = e.currentTarget;
+    const originalContent = card.innerHTML;
+    card.innerHTML = '<span class="text-blue-600 text-sm">Uploading...</span>';
+
+    const resp = await authFetch('/api/bulk/upload', { method: 'POST', body: formData });
+    card.innerHTML = originalContent;
+    if (resp.ok) {
+        loadDocuments();
+        loadGroups();
+    }
+}
+
+function selectGroup(groupId) {
+    currentGroup = groupId;
+    loadDocuments();
+    loadBreadcrumbs(groupId);
+}
+
+async function loadBreadcrumbs(groupId) {
+    if (!groupId) {
+        document.getElementById('breadcrumb-container').classList.add('hidden');
+        return;
+    }
+    try {
+        const resp = await authFetch('/api/groups/' + groupId + '/breadcrumbs');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const items = data.items || [];
+        if (items.length === 0) {
+            document.getElementById('breadcrumb-container').classList.add('hidden');
+            return;
+        }
+        const ol = document.getElementById('breadcrumb-list');
+        ol.innerHTML = '<li><a href="/dashboard" class="text-blue-600 hover:underline" onclick="selectGroup(null);loadDocuments();return false;">Home</a></li>' +
+            items.map((item, idx) => {
+                const isLast = idx === items.length - 1;
+                return `<li class="flex items-center"><span class="mx-1 text-gray-400">/</span>${isLast
+                    ? '<span class="text-gray-700">' + escapeHtml(item.name) + '</span>'
+                    : '<a href="#" class="text-blue-600 hover:underline" onclick="selectGroup(' + item.id + ');return false;">' + escapeHtml(item.name) + '</a>'
+                }</li>`;
+            }).join('');
+        document.getElementById('breadcrumb-container').classList.remove('hidden');
+    } catch (e) { /* ignore */ }
+}
+
+async function loadDocuments() {
+    let url = '/api/documents';
+    const params = [];
+    if (currentGroup) params.push(`group_id=${currentGroup}`);
+    const status = document.getElementById('status-filter').value;
+    if (status) params.push(`status=${status}`);
+    if (params.length) url += '?' + params.join('&');
+
+    const resp = await authFetch(url);
+    if (!resp.ok) {
+        document.getElementById('documents-grid').innerHTML = '<p class="text-gray-500">Failed to load documents</p>';
+        return;
+    }
+    const docs = await resp.json();
+    const grid = document.getElementById('documents-grid');
+    if (docs.length === 0) {
+        grid.innerHTML = '<p class="text-gray-500">No documents found</p>';
+        return;
+    }
+    grid.innerHTML = docs.map(d => `
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="font-medium text-sm truncate">${escapeHtml(d.original_filename)}</h3>
+                <span class="inline-block px-2 py-1 text-xs rounded-full ${statusColor(d.status)}">${escapeHtml(d.status)}</span>
+            </div>
+            <p class="text-xs text-gray-500 mb-2">${d.summary ? escapeHtml(d.summary.substring(0, 100)) + '...' : 'No summary'}</p>
+            <div class="flex justify-between items-center text-xs text-gray-400">
+                <span>${new Date(d.created_at).toLocaleDateString()}</span>
+                <a href="/documents/${d.id}/view" class="text-blue-600 hover:underline">View</a>
+            </div>
+        </div>
+    `).join('');
+}
+
+function statusColor(status) {
+    const colors = {
+        uploaded: 'bg-yellow-100 text-yellow-800',
+        processing: 'bg-blue-100 text-blue-800',
+        processed: 'bg-green-100 text-green-800',
+        failed: 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+}
+
+async function uploadDocument(input) {
+    if (!input.files.length) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    if (currentGroup) formData.append('group_id', currentGroup);
+    const resp = await authFetch('/api/documents/upload', { method: 'POST', body: formData });
+    if (resp.ok) loadDocuments();
+    input.value = '';
+}
+
+document.getElementById('status-filter').addEventListener('change', loadDocuments);
+loadGroups();
+loadDocuments();
+</script>
+{% endblock %}

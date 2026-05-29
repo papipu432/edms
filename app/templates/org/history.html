@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Change History - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Change History</h1>
+<div id="history-list" class="bg-white rounded shadow p-4">
+    <p class="text-gray-500">Loading...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+authFetch('/org/api/history').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('history-list');
+    if(!data.length){el.innerHTML='<p>No history entries.</p>';return;}
+    el.innerHTML='<table class="w-full"><thead><tr><th class="text-left p-2">Type</th><th class="text-left p-2">Target</th><th class="text-left p-2">Date</th></tr></thead><tbody>'+data.map(h=>'<tr><td class="p-2">'+escapeHtml(h.change_type)+'</td><td class="p-2">'+escapeHtml(h.target_type)+'</td><td class="p-2">'+escapeHtml(h.changed_at||'')+'</td></tr>').join('')+'</tbody></table>';
+});
+</script>
+{% endblock %}

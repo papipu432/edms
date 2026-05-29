@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Security Monitoring - EDMS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-gray-900">Security Monitoring</h1>
+
+    <!-- Status Card -->
+    <div class="bg-white shadow rounded-lg p-6" id="status-card"
+         hx-get="/api/security/status" hx-trigger="every 5s"
+         hx-target="#status-content" hx-swap="innerHTML"
+         hx-headers='{"Authorization": "Bearer " + localStorage.getItem("edms_token")}'>
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Monitoring Status</h2>
+        <div id="status-content">
+            <p class="text-gray-500">Loading status...</p>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Controls</h2>
+        <div class="flex space-x-4">
+            <button onclick="startMonitor()" id="btn-start"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                Start Monitoring
+            </button>
+            <button onclick="stopMonitor()" id="btn-stop"
+                    class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                Stop Monitoring
+            </button>
+        </div>
+    </div>
+
+    <!-- Configuration Panel -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Configuration</h2>
+        <form onsubmit="saveConfig(event)" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Threshold (ops/sec)</label>
+                    <input type="number" id="cfg-threshold" min="1"
+                           class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Window (seconds)</label>
+                    <input type="number" id="cfg-window" min="1"
+                           class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Monitored Directory</label>
+                    <input type="text" id="cfg-dir"
+                           class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2">
+                </div>
+            </div>
+            <button type="submit"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Save Configuration
+            </button>
+        </form>
+    </div>
+
+    <!-- Real-time Metrics -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Real-time Metrics</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="metrics-content">
+            <div class="text-center">
+                <p class="text-3xl font-bold text-blue-600" id="metric-ops">0</p>
+                <p class="text-sm text-gray-500">Ops/sec</p>
+            </div>
+            <div class="text-center">
+                <p class="text-3xl font-bold text-green-600" id="metric-files">0</p>
+                <p class="text-sm text-gray-500">Files Monitored</p>
+            </div>
+            <div class="text-center">
+                <p class="text-3xl font-bold text-yellow-600" id="metric-alerts">0</p>
+                <p class="text-sm text-gray-500">Alerts</p>
+            </div>
+            <div class="text-center">
+                <p class="text-3xl font-bold text-purple-600" id="metric-uptime">0s</p>
+                <p class="text-sm text-gray-500">Uptime</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert History -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Alert History</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detected</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="alerts-table" class="bg-white divide-y divide-gray-200">
+                    <tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">No alerts</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadStatus() {
+        authFetch('/api/security/status').then(r => r.json()).then(data => {
+            const badge = data.is_running
+                ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>'
+                : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>';
+            document.getElementById('status-content').innerHTML = `
+                <div class="flex items-center space-x-4">
+                    <div>${badge}</div>
+                    <div class="text-sm text-gray-600">Uptime: ${data.uptime}s</div>
+                    <div class="text-sm text-gray-600">Ops/sec: ${data.ops_per_sec}</div>
+                    <div class="text-sm text-gray-600">Watchdog: ${data.watchdog_available ? 'Available' : 'Not installed'}</div>
+                </div>`;
+            document.getElementById('metric-ops').textContent = data.ops_per_sec;
+            document.getElementById('metric-files').textContent = data.files_monitored;
+            document.getElementById('metric-alerts').textContent = data.alerts_total || data.alerts_count;
+            document.getElementById('metric-uptime').textContent = data.uptime + 's';
+        }).catch(() => {});
+    }
+
+    function loadConfig() {
+        authFetch('/api/security/config').then(r => r.json()).then(data => {
+            document.getElementById('cfg-threshold').value = data.threshold_ops_per_sec;
+            document.getElementById('cfg-window').value = data.window_seconds;
+            document.getElementById('cfg-dir').value = data.monitored_dir;
+        }).catch(() => {});
+    }
+
+    function loadAlerts() {
+        authFetch('/api/security/alerts').then(r => r.json()).then(data => {
+            const tbody = document.getElementById('alerts-table');
+            if (!data.alerts || data.alerts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">No alerts</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.alerts.map(a => {
+                const severityColors = {
+                    critical: 'bg-red-100 text-red-800',
+                    high: 'bg-orange-100 text-orange-800',
+                    medium: 'bg-yellow-100 text-yellow-800',
+                    low: 'bg-blue-100 text-blue-800'
+                };
+                const color = severityColors[a.severity] || 'bg-gray-100 text-gray-800';
+                const ackBtn = a.acknowledged
+                    ? '<span class="text-green-600 text-xs">Acknowledged</span>'
+                    : `<button onclick="acknowledgeAlert('${a.id}')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">Acknowledge</button>`;
+                return `<tr>
+                    <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${color}">${escapeHtml(a.severity)}</span></td>
+                    <td class="px-4 py-3 text-sm">${escapeHtml(a.alert_type)}</td>
+                    <td class="px-4 py-3 text-sm">${escapeHtml(a.message)}</td>
+                    <td class="px-4 py-3 text-sm">${escapeHtml(a.source_path || '-')}</td>
+                    <td class="px-4 py-3 text-sm">${a.detected_at ? new Date(a.detected_at).toLocaleString() : '-'}</td>
+                    <td class="px-4 py-3 text-sm">${a.acknowledged ? 'Ack' : 'Pending'}</td>
+                    <td class="px-4 py-3">${ackBtn}</td>
+                </tr>`;
+            }).join('');
+        }).catch(() => {});
+    }
+
+    function startMonitor() {
+        authFetch('/api/security/monitor/start', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => loadStatus())
+            .catch(() => {});
+    }
+
+    function stopMonitor() {
+        authFetch('/api/security/monitor/stop', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => loadStatus())
+            .catch(() => {});
+    }
+
+    function saveConfig(e) {
+        e.preventDefault();
+        const body = {
+            threshold_ops_per_sec: parseInt(document.getElementById('cfg-threshold').value) || null,
+            window_seconds: parseInt(document.getElementById('cfg-window').value) || null,
+            monitored_dir: document.getElementById('cfg-dir').value || null,
+        };
+        authFetch('/api/security/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        }).then(r => r.json()).then(() => {
+            loadConfig();
+            loadStatus();
+        }).catch(() => {});
+    }
+
+    function acknowledgeAlert(alertId) {
+        authFetch('/api/security/alerts/' + alertId + '/acknowledge', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => loadAlerts())
+            .catch(() => {});
+    }
+
+    // Initial load
+    loadStatus();
+    loadConfig();
+    loadAlerts();
+
+    // Poll for updates
+    setInterval(loadStatus, 5000);
+    setInterval(loadAlerts, 10000);
+</script>
+{% endblock %}

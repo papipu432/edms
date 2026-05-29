@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health Score Dashboard</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 24px; background: #f8f9fa; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { color: #1a1a2e; margin-bottom: 8px; }
+.subtitle { color: #666; margin-bottom: 32px; }
+.score-section { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 32px; }
+.gauge-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; flex: 0 0 280px; }
+.gauge-svg { width: 200px; height: 200px; }
+.gauge-bg { fill: none; stroke: #e0e0e0; stroke-width: 16; }
+.gauge-fill { fill: none; stroke-width: 16; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+.gauge-text { font-size: 36px; font-weight: bold; fill: #1a1a2e; }
+.gauge-label { font-size: 14px; fill: #666; }
+.components { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); flex: 1; min-width: 400px; }
+.component-row { display: flex; align-items: center; margin-bottom: 16px; }
+.component-name { width: 100px; font-weight: 500; color: #333; }
+.component-bar-bg { flex: 1; height: 24px; background: #e9ecef; border-radius: 12px; position: relative; overflow: hidden; }
+.component-bar { height: 100%; border-radius: 12px; transition: width 0.8s ease; }
+.component-value { width: 60px; text-align: right; font-weight: 600; color: #333; margin-left: 12px; }
+.trend-section { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: 24px; }
+.trend-chart { width: 100%; height: 200px; position: relative; }
+.trend-line { stroke: #4361ee; stroke-width: 2; fill: none; }
+.trend-area { fill: rgba(67, 97, 238, 0.1); }
+.trend-dot { fill: #4361ee; r: 4; }
+.loading { text-align: center; padding: 40px; color: #666; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Health Score Dashboard</h1>
+    <p class="subtitle">System health overview and historical trends</p>
+
+    <div class="score-section">
+        <div class="gauge-card">
+            <svg class="gauge-svg" viewBox="0 0 200 200">
+                <circle class="gauge-bg" cx="100" cy="100" r="80" />
+                <circle class="gauge-fill" id="gauge-arc" cx="100" cy="100" r="80"
+                    stroke-dasharray="502.65" stroke-dashoffset="502.65"
+                    transform="rotate(-90 100 100)" />
+                <text class="gauge-text" x="100" y="105" text-anchor="middle" id="score-value">--</text>
+                <text class="gauge-label" x="100" y="130" text-anchor="middle">Composite Score</text>
+            </svg>
+        </div>
+
+        <div class="components">
+            <h3>Component Breakdown</h3>
+            <div id="component-list">
+                <p class="loading">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="trend-section">
+        <h3>Historical Trend (Last 30 Days)</h3>
+        <div class="trend-chart">
+            <svg id="trend-svg" width="100%" height="200" preserveAspectRatio="none"></svg>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadScore() {
+    try {
+        const token = document.cookie.split(';').find(c => c.trim().startsWith('access_token='));
+        const headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token.split('=')[1];
+
+        const res = await fetch('/api/health/score', { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Update gauge
+        const score = data.composite_score;
+        document.getElementById('score-value').textContent = Math.round(score);
+        const arc = document.getElementById('gauge-arc');
+        const circumference = 502.65;
+        const offset = circumference - (score / 100) * circumference;
+        arc.style.strokeDashoffset = offset;
+
+        // Color based on score
+        let color = '#28a745';
+        if (score < 50) color = '#dc3545';
+        else if (score < 75) color = '#ffc107';
+        arc.style.stroke = color;
+
+        // Update components
+        const list = document.getElementById('component-list');
+        list.innerHTML = '';
+        data.components.forEach(function(comp) {
+            let barColor = '#28a745';
+            if (comp.score < 50) barColor = '#dc3545';
+            else if (comp.score < 75) barColor = '#ffc107';
+
+            list.innerHTML += '<div class="component-row">' +
+                '<span class="component-name">' + comp.name + '</span>' +
+                '<div class="component-bar-bg"><div class="component-bar" style="width:' + comp.score + '%;background:' + barColor + '"></div></div>' +
+                '<span class="component-value">' + Math.round(comp.score) + '</span></div>';
+        });
+    } catch (e) {
+        console.error('Failed to load health score:', e);
+    }
+}
+
+async function loadHistory() {
+    try {
+        const token = document.cookie.split(';').find(c => c.trim().startsWith('access_token='));
+        const headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token.split('=')[1];
+
+        const res = await fetch('/api/health/score/history?days=30', { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.history || data.history.length === 0) return;
+
+        const svg = document.getElementById('trend-svg');
+        const width = svg.clientWidth || 800;
+        const height = 200;
+        const padding = 20;
+        const points = data.history.reverse();
+        const n = points.length;
+        if (n === 0) return;
+
+        let pathD = '';
+        let areaD = 'M ' + padding + ' ' + height + ' ';
+        points.forEach(function(p, i) {
+            const x = padding + (i / Math.max(n - 1, 1)) * (width - 2 * padding);
+            const y = height - padding - (p.composite_score / 100) * (height - 2 * padding);
+            if (i === 0) pathD += 'M ';
+            else pathD += 'L ';
+            pathD += x + ' ' + y + ' ';
+            areaD += 'L ' + x + ' ' + y + ' ';
+        });
+        const lastX = padding + ((n - 1) / Math.max(n - 1, 1)) * (width - 2 * padding);
+        areaD += 'L ' + lastX + ' ' + height + ' Z';
+
+        svg.innerHTML = '<path class="trend-area" d="' + areaD + '"/><path class="trend-line" d="' + pathD + '"/>';
+    } catch (e) {
+        console.error('Failed to load history:', e);
+    }
+}
+
+loadScore();
+loadHistory();
+</script>
+</body>
+</html>

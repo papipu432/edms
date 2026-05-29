@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Permissions - EDMS{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Permissions</h1>
+<div id="perms-list" class="bg-white rounded shadow p-4">
+    <p class="text-gray-500">Loading...</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+authFetch('/rbac/api/permissions').then(r=>r.json()).then(data=>{
+    const el = document.getElementById('perms-list');
+    if(!data.length){el.innerHTML='<p>No permissions found.</p>';return;}
+    el.innerHTML='<table class="w-full"><thead><tr><th class="text-left p-2">Resource</th><th class="text-left p-2">Action</th><th class="text-left p-2">Description</th></tr></thead><tbody>'+data.map(p=>'<tr><td class="p-2">'+escapeHtml(p.resource)+'</td><td class="p-2">'+escapeHtml(p.action)+'</td><td class="p-2">'+escapeHtml(p.description||'')+'</td></tr>').join('')+'</tbody></table>';
+});
+</script>
+{% endblock %}

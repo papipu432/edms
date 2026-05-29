@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -44,7 +43,7 @@ class TestWikiIngest:
         """Test that ingest creates a summary file for the document."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -66,7 +65,7 @@ class TestWikiIngest:
         """Test that ingest updates the index.md file."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -84,7 +83,7 @@ class TestWikiIngest:
         """Test that ingest appends an entry to log.md."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -104,25 +103,22 @@ class TestWikiIngest:
         """Test that ingest creates entity/topic pages when LLM returns results."""
         wiki_path = tmp_path / "wiki"
 
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
+        mock_extract = MagicMock(return_value={
             "entities": ["Python", "FastAPI"],
             "topics": ["Web Development"],
         })
-        mock_client.chat.completions.create.return_value = mock_response
 
-        with patch("app.services.wiki.get_llm_client", return_value=mock_client):
-            service = WikiService(wiki_path=str(wiki_path))
-            service.ingest(
-                doc_id=1,
-                title="Test Doc",
-                markdown_content="Python and FastAPI for web development.",
-                summary="A doc about Python and FastAPI.",
-                keywords=["python", "fastapi"],
-                metadata={},
-            )
+        with patch("app.services.wiki.extract_entities_topics", mock_extract):
+            with patch("app.core.llm.get_chat_model", return_value=None):
+                service = WikiService(wiki_path=str(wiki_path))
+                service.ingest(
+                    doc_id=1,
+                    title="Test Doc",
+                    markdown_content="Python and FastAPI for web development.",
+                    summary="A doc about Python and FastAPI.",
+                    keywords=["python", "fastapi"],
+                    metadata={},
+                )
 
         assert (wiki_path / "entities" / "python.md").exists()
         assert (wiki_path / "entities" / "fastapi.md").exists()
@@ -138,48 +134,36 @@ class TestWikiIngest:
         """Test that ingesting a second document merges info into existing entity pages."""
         wiki_path = tmp_path / "wiki"
 
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
+        mock_extract = MagicMock(return_value={
             "entities": ["Python"],
             "topics": [],
         })
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_merge = MagicMock(return_value="# Python\n\nMerged content from Doc One and Doc Two.")
 
-        with patch("app.services.wiki.get_llm_client", return_value=mock_client):
-            service = WikiService(wiki_path=str(wiki_path))
+        with patch("app.services.wiki.extract_entities_topics", mock_extract):
+            with patch("app.services.wiki.merge_content", mock_merge):
+                with patch("app.core.llm.get_chat_model", return_value=None):
+                    service = WikiService(wiki_path=str(wiki_path))
 
-            # First ingest
-            service.ingest(
-                doc_id=1,
-                title="Doc One",
-                markdown_content="Python basics.",
-                summary="Basics of Python.",
-                keywords=["python"],
-                metadata={},
-            )
+                    # First ingest
+                    service.ingest(
+                        doc_id=1,
+                        title="Doc One",
+                        markdown_content="Python basics.",
+                        summary="Basics of Python.",
+                        keywords=["python"],
+                        metadata={},
+                    )
 
-            # For the merge call, return merged content
-            merge_response = MagicMock()
-            merge_response.choices = [MagicMock()]
-            merge_response.choices[0].message.content = "# Python\n\nMerged content from Doc One and Doc Two."
-
-            # Second call for extraction, third for merge
-            mock_client.chat.completions.create.side_effect = [
-                mock_response,  # extract entities/topics
-                merge_response,  # merge page content
-            ]
-
-            # Second ingest
-            service.ingest(
-                doc_id=2,
-                title="Doc Two",
-                markdown_content="Advanced Python.",
-                summary="Advanced Python topics.",
-                keywords=["python", "advanced"],
-                metadata={},
-            )
+                    # Second ingest
+                    service.ingest(
+                        doc_id=2,
+                        title="Doc Two",
+                        markdown_content="Advanced Python.",
+                        summary="Advanced Python topics.",
+                        keywords=["python", "advanced"],
+                        metadata={},
+                    )
 
         entity_content = (wiki_path / "entities" / "python.md").read_text(encoding="utf-8")
         assert "Merged content" in entity_content or "Python" in entity_content
@@ -190,7 +174,7 @@ class TestWikiQuery:
         """Test that query searches wiki and returns an LLM-generated answer."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -211,7 +195,7 @@ class TestWikiQuery:
         """Test that query works gracefully without API key."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         with patch("app.services.wiki.chat_completion", return_value="Chat is not available (no API key configured)"):
@@ -225,7 +209,7 @@ class TestWikiLint:
         """Test that lint detects pages not listed in index.md."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         # Create an orphan page (not in index.md)
@@ -241,7 +225,7 @@ class TestWikiLint:
         """Test that lint detects broken markdown links."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         # Create a page with a broken link
@@ -260,7 +244,7 @@ class TestWikiLint:
         """Test that a properly structured wiki has no lint issues."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         # A fresh wiki with no extra files should have no issues
@@ -273,7 +257,7 @@ class TestWikiGetters:
         """Test get_index returns content and page list."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -292,7 +276,7 @@ class TestWikiGetters:
         """Test get_page returns page content."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -311,7 +295,7 @@ class TestWikiGetters:
         """Test get_page returns None for missing page."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         content = service.get_page("entities/nonexistent.md")
@@ -321,7 +305,7 @@ class TestWikiGetters:
         """Test get_page rejects path traversal attempts."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         # Create a .md file outside the wiki directory
@@ -336,7 +320,7 @@ class TestWikiGetters:
         """Test get_page rejects nested path traversal attempts."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
 
         # Create a .md file outside the wiki directory in a nested path
@@ -353,7 +337,7 @@ class TestWikiGetters:
         """Test get_log returns log entries."""
         wiki_path = tmp_path / "wiki"
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service = WikiService(wiki_path=str(wiki_path))
             service.ingest(
                 doc_id=1,
@@ -381,7 +365,7 @@ async def wiki_client(tmp_path: Path):
     # Create a wiki service with tmp_path
     wiki_path = tmp_path / "wiki"
 
-    with patch("app.services.wiki.get_llm_client", return_value=None):
+    with patch("app.core.llm.get_chat_model", return_value=None):
         test_wiki_service = WikiService(wiki_path=str(wiki_path))
 
     # Override the module-level wiki_service
@@ -414,7 +398,7 @@ class TestWikiAPIEndpoints:
         client, service = wiki_client
 
         # Ingest a document to create a page
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service.ingest(
                 doc_id=1,
                 title="API Test Doc",
@@ -443,7 +427,7 @@ class TestWikiAPIEndpoints:
         """Test POST /api/wiki/query returns an answer."""
         client, service = wiki_client
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service.ingest(
                 doc_id=1,
                 title="Python Guide",
@@ -487,7 +471,7 @@ class TestWikiAPIEndpoints:
         """Test GET /api/wiki/log returns log entries."""
         client, service = wiki_client
 
-        with patch("app.services.wiki.get_llm_client", return_value=None):
+        with patch("app.core.llm.get_chat_model", return_value=None):
             service.ingest(
                 doc_id=1,
                 title="Log Test",

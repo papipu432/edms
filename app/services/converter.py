@@ -1,3 +1,4 @@
+import enum
 import io
 import logging
 from dataclasses import dataclass, field
@@ -8,6 +9,28 @@ from PIL import Image
 from app.services.preprocessing import PreprocessingService
 
 logger = logging.getLogger(__name__)
+
+# Try importing optional conversion engines
+try:
+    from marker.converters.pdf import PdfConverter
+    from marker.models import create_model_dict
+
+    MARKER_AVAILABLE = True
+except ImportError:
+    MARKER_AVAILABLE = False
+
+try:
+    from docling.document_converter import DocumentConverter
+
+    DOCLING_AVAILABLE = True
+except ImportError:
+    DOCLING_AVAILABLE = False
+
+
+class ConversionEngine(str, enum.Enum):
+    PYMUPDF = "pymupdf"
+    MARKER = "marker"
+    DOCLING = "docling"
 
 
 @dataclass
@@ -21,10 +44,36 @@ class ConversionResult:
 class ConversionService:
     """Converts documents to Markdown, extracting tables and images."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, preferred_engine: ConversionEngine = ConversionEngine.PYMUPDF
+    ) -> None:
         self.preprocessing = PreprocessingService()
+        self.preferred_engine = preferred_engine
 
     def convert_pdf(self, file_path: Path) -> ConversionResult:
+        """Extract text, images, and tables from a PDF.
+
+        Uses the preferred engine first, falling back to PyMuPDF if it fails.
+        """
+        if self.preferred_engine == ConversionEngine.MARKER:
+            try:
+                return self.convert_pdf_marker(file_path)
+            except Exception as e:
+                logger.warning(
+                    "Marker conversion failed, falling back to PyMuPDF: %s", e
+                )
+
+        elif self.preferred_engine == ConversionEngine.DOCLING:
+            try:
+                return self.convert_pdf_docling(file_path)
+            except Exception as e:
+                logger.warning(
+                    "Docling conversion failed, falling back to PyMuPDF: %s", e
+                )
+
+        return self._convert_pdf_pymupdf(file_path)
+
+    def _convert_pdf_pymupdf(self, file_path: Path) -> ConversionResult:
         """Extract text, images, and tables from a PDF using pymupdf."""
         import fitz
 
@@ -68,6 +117,71 @@ class ConversionService:
                 result.metadata["ocr_used"] = True
 
         result.markdown_content = "\n\n".join(markdown_parts)
+        return result
+
+    def convert_pdf_marker(self, file_path: Path) -> ConversionResult:
+        """Convert PDF using Marker library (Surya OCR)."""
+        if not MARKER_AVAILABLE:
+            raise RuntimeError("marker-pdf is not installed")
+
+        result = ConversionResult()
+
+        model_dict = create_model_dict()
+        converter = PdfConverter(artifact_dict=model_dict)
+        rendered = converter(str(file_path))
+
+        # Marker returns rendered document with markdown
+        result.markdown_content = rendered.markdown
+        result.metadata["engine"] = "marker"
+
+        return result
+
+    def convert_pdf_docling(self, file_path: Path) -> ConversionResult:
+        """Convert PDF using Docling library."""
+        if not DOCLING_AVAILABLE:
+            raise RuntimeError("docling is not installed")
+
+        result = ConversionResult()
+
+        converter = DocumentConverter()
+        doc_result = converter.convert(str(file_path))
+
+        # Docling provides markdown export
+        result.markdown_content = doc_result.document.export_to_markdown()
+        result.metadata["engine"] = "docling"
+
+        return result
+
+    def convert_image_opencv(self, file_path: Path) -> ConversionResult:
+        """OCR an image file using OpenCV preprocessing before OCR."""
+        result = ConversionResult()
+
+        try:
+            image = Image.open(file_path)
+            # Convert to RGB if necessary
+            if image.mode not in ("RGB", "L"):
+                image = image.convert("RGB")
+
+            # Use OpenCV preprocessing pipeline
+            processed = self.preprocessing.preprocess_pipeline(image, engine="opencv")
+
+            try:
+                import pytesseract
+
+                text = pytesseract.image_to_string(processed)
+                result.markdown_content = text.strip()
+                result.metadata["engine"] = "opencv+tesseract"
+            except Exception as e:
+                logger.warning(
+                    "Tesseract not available for image OCR: %s", e
+                )
+                result.metadata["warning"] = "tesseract not available"
+                result.markdown_content = ""
+
+        except Exception as e:
+            logger.error("Image conversion error (opencv): %s", e)
+            result.metadata["error"] = str(e)
+
         return result
 
     def _ocr_pdf_pages(self, file_path: Path) -> str:
@@ -147,7 +261,22 @@ class ConversionService:
             try:
                 import pytesseract
 
-                text = pytesseract.image_to_string(processed)
+                # Use image_to_data for confidence scores
+                try:
+                    data = pytesseract.image_to_data(
+                        processed, output_type=pytesseract.Output.DATAFRAME
+                    )
+                    # Filter valid confidence values (conf > -1 means recognized)
+                    valid_conf = data[data["conf"] > -1]["conf"]
+                    if len(valid_conf) > 0:
+                        avg_confidence = float(valid_conf.mean())
+                        result.metadata["ocr_confidence"] = avg_confidence
+                    # Still get text via image_to_string for best output
+                    text = pytesseract.image_to_string(processed)
+                except Exception:
+                    # Fallback to just image_to_string if data extraction fails
+                    text = pytesseract.image_to_string(processed)
+
                 result.markdown_content = text.strip()
             except Exception as e:
                 logger.warning(

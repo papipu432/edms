@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Cross References - EDMS{% endblock %}
+{% block content %}
+<div class="flex gap-6">
+    <!-- Left: Document content -->
+    <div class="flex-1">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h1 id="doc-title" class="text-xl font-bold mb-4">Loading...</h1>
+            <div id="doc-content" class="prose max-w-none">
+                <p class="text-gray-500">Loading document content...</p>
+            </div>
+        </div>
+    </div>
+    <!-- Right: Related Documents -->
+    <div class="w-80 flex-shrink-0">
+        <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-4">Related Documents</h2>
+            <div id="related-docs" class="space-y-3">
+                <p class="text-sm text-gray-500">Loading...</p>
+            </div>
+        </div>
+        <div class="mt-4 bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-4">Shared Entities</h2>
+            <div id="shared-entities" class="space-y-2">
+                <p class="text-sm text-gray-500">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const documentId = {{ document_id }};
+
+async function loadDocument() {
+    const resp = await authFetch(`/api/documents/${documentId}`);
+    if (!resp.ok) return;
+    const doc = await resp.json();
+    document.getElementById('doc-title').textContent = doc.original_filename;
+
+    if (doc.markdown_path) {
+        const mdResp = await authFetch(`/api/documents/${documentId}/markdown`);
+        if (mdResp.ok) {
+            const mdData = await mdResp.json();
+            document.getElementById('doc-content').innerHTML = `<pre class="whitespace-pre-wrap text-sm">${escapeHtml(mdData.content || '')}</pre>`;
+        }
+    } else {
+        document.getElementById('doc-content').innerHTML = '<p class="text-gray-500">No content available</p>';
+    }
+}
+
+async function loadRelatedDocs() {
+    const resp = await authFetch('/api/wiki/index');
+    if (!resp.ok) {
+        document.getElementById('related-docs').innerHTML = '<p class="text-sm text-gray-500">Could not load wiki index</p>';
+        return;
+    }
+    const index = await resp.json();
+
+    // Find entities that reference this document
+    const relatedDocIds = new Set();
+    const sharedEntities = [];
+    if (index.entities) {
+        for (const [entity, docIds] of Object.entries(index.entities)) {
+            if (docIds.includes(documentId)) {
+                sharedEntities.push(entity);
+                docIds.forEach(id => { if (id !== documentId) relatedDocIds.add(id); });
+            }
+        }
+    }
+
+    // Display shared entities
+    const entitiesDiv = document.getElementById('shared-entities');
+    if (sharedEntities.length === 0) {
+        entitiesDiv.innerHTML = '<p class="text-sm text-gray-500">No shared entities found</p>';
+    } else {
+        entitiesDiv.innerHTML = sharedEntities.map(e => `<span class="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full mr-1 mb-1">${escapeHtml(e)}</span>`).join('');
+    }
+
+    // Display related documents
+    const relatedDiv = document.getElementById('related-docs');
+    if (relatedDocIds.size === 0) {
+        relatedDiv.innerHTML = '<p class="text-sm text-gray-500">No related documents found</p>';
+        return;
+    }
+
+    const docLinks = [];
+    for (const docId of relatedDocIds) {
+        const docResp = await authFetch(`/api/documents/${docId}`);
+        if (docResp.ok) {
+            const doc = await docResp.json();
+            docLinks.push(`<a href="/documents/${doc.id}/crossref" class="block p-2 rounded hover:bg-blue-50 text-sm text-blue-600">${escapeHtml(doc.original_filename)}</a>`);
+        }
+    }
+    relatedDiv.innerHTML = docLinks.length ? docLinks.join('') : '<p class="text-sm text-gray-500">No related documents found</p>';
+}
+
+loadDocument();
+loadRelatedDocs();
+</script>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Health Monitor - EDMS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-gray-900">Lifecycle Health Monitor</h1>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="summary-cards">
+        <div class="bg-white shadow rounded-lg p-4 text-center">
+            <p class="text-3xl font-bold text-red-600" id="count-expired">0</p>
+            <p class="text-sm text-gray-500">Expired Lifecycles</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-4 text-center">
+            <p class="text-3xl font-bold text-orange-600" id="count-broken-reviewer">0</p>
+            <p class="text-sm text-gray-500">Broken Reviewers</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-4 text-center">
+            <p class="text-3xl font-bold text-yellow-600" id="count-empty-group">0</p>
+            <p class="text-sm text-gray-500">Empty Groups</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-4 text-center">
+            <p class="text-3xl font-bold text-blue-600" id="count-stale">0</p>
+            <p class="text-sm text-gray-500">Stale Documents</p>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex space-x-4">
+            <button onclick="runHealthCheck()"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Run Health Check
+            </button>
+            <button onclick="sendDigest()"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                Send Email Digest
+            </button>
+        </div>
+        <p id="digest-status" class="mt-2 text-sm text-gray-500"></p>
+    </div>
+
+    <!-- Issues Table -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Health Issues</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detail</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recommended Action</th>
+                    </tr>
+                </thead>
+                <tbody id="issues-table" class="bg-white divide-y divide-gray-200">
+                    <tr><td colspan="5" class="px-4 py-3 text-center text-gray-500">Click "Run Health Check" to scan for issues</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function runHealthCheck() {
+        authFetch('/api/health/check').then(r => r.json()).then(data => {
+            updateDashboard(data);
+        }).catch(err => {
+            console.error('Health check failed:', err);
+        });
+    }
+
+    function sendDigest() {
+        authFetch('/api/health/send-digest', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                const status = document.getElementById('digest-status');
+                if (data.sent_to && data.sent_to.length > 0) {
+                    status.textContent = 'Digest sent to: ' + data.sent_to.join(', ');
+                    status.className = 'mt-2 text-sm text-green-600';
+                } else {
+                    status.textContent = 'No admin emails found to send digest to.';
+                    status.className = 'mt-2 text-sm text-yellow-600';
+                }
+                updateDashboard(data.report);
+            }).catch(err => {
+                console.error('Send digest failed:', err);
+            });
+    }
+
+    function updateDashboard(report) {
+        // Update summary counts
+        const summary = report.summary || {};
+        document.getElementById('count-expired').textContent = summary.expired_lifecycle || 0;
+        document.getElementById('count-broken-reviewer').textContent = summary.broken_reviewer || 0;
+        document.getElementById('count-empty-group').textContent = summary.empty_group || 0;
+        document.getElementById('count-stale').textContent = summary.stale_document || 0;
+
+        // Update issues table
+        const tbody = document.getElementById('issues-table');
+        if (!report.issues || report.issues.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-3 text-center text-green-600 font-medium">No issues found - system is healthy!</td></tr>';
+            return;
+        }
+        tbody.innerHTML = report.issues.map(issue => {
+            const severityColors = {
+                high: 'bg-red-100 text-red-800',
+                medium: 'bg-yellow-100 text-yellow-800',
+                low: 'bg-blue-100 text-blue-800'
+            };
+            const color = severityColors[issue.severity] || 'bg-gray-100 text-gray-800';
+            const docName = issue.document_name || '-';
+            return `<tr>
+                <td class="px-4 py-3 text-sm">${escapeHtml(docName)}</td>
+                <td class="px-4 py-3 text-sm">${escapeHtml(issue.issue_type)}</td>
+                <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${color}">${escapeHtml(issue.severity)}</span></td>
+                <td class="px-4 py-3 text-sm">${escapeHtml(issue.detail)}</td>
+                <td class="px-4 py-3 text-sm">${escapeHtml(issue.recommended_action)}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // Auto-run health check on page load
+    runHealthCheck();
+</script>
+{% endblock %}

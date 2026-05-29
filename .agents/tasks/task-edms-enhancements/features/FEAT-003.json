@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Add Role-Based Access Control (RBAC) system with JWT authentication, user management, role-based permissions, and document folder assignment. Roles: admin, reviewer, editor, annotator, approver.",
+  "status": "completed",
+  "steps": [
+    "Add dependencies via 'uv add': python-jose[cryptography], passlib[bcrypt], pyjwt. Run 'uv sync'.",
+    "Create app/models/user.py: Define User model (id, username, email, hashed_password, is_active, created_at, updated_at) and Role model (id, name as enum: admin/reviewer/editor/annotator/approver, description). Define UserRole association table (user_id, role_id). Define FolderAssignment model (id, user_id, folder_path, role_id, granted_at). All models inherit from the existing Base in app/models/group.py. Add relationships: User.roles -> list[Role], User.folder_assignments -> list[FolderAssignment].",
+    "Create app/core/security.py: Implement password hashing (passlib bcrypt), JWT token creation/verification (python-jose), get_current_user dependency (extracts user from Authorization header Bearer token), role_required(roles: list[str]) dependency factory that checks user has required role. Add settings to app/core/config.py: SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES (default 30), ALGORITHM (default HS256).",
+    "Create app/schemas/user.py: Define UserCreate (username, email, password), UserResponse (id, username, email, is_active, roles, created_at), Token (access_token, token_type), TokenData (username, roles), RoleAssign (user_id, role_name), FolderAssignmentCreate (user_id, folder_path, role_name), FolderAssignmentResponse (id, user_id, folder_path, role_name, granted_at).",
+    "Create app/api/auth.py: POST /api/auth/register (create user), POST /api/auth/login (authenticate, return JWT), GET /api/auth/me (get current user info). Registration creates user with no roles by default. Login validates credentials and returns access_token.",
+    "Create app/api/users.py: GET /api/users (admin only - list users), GET /api/users/{id} (admin only - get user details), POST /api/users/{id}/roles (admin only - assign role to user), DELETE /api/users/{id}/roles/{role_name} (admin only - remove role), POST /api/users/{id}/folders (admin only - assign folder access), GET /api/users/{id}/folders (get user's folder assignments), DELETE /api/users/{id}/folders/{assignment_id} (admin only - remove folder assignment).",
+    "Add permission-checking middleware: Create a require_folder_access(folder_path, min_role) dependency that checks if the user has access to the specified folder path (exact match or parent path). Apply folder access checks to document endpoints in app/api/documents.py - upload requires editor/admin role for the group, download/view requires any assigned role.",
+    "Update app/api/router.py to include auth_router and users_router.",
+    "Update app/main.py lifespan to create default admin user (admin/admin) if no users exist, and ensure role records are created in DB.",
+    "Create tests/test_auth.py: Test registration, login, JWT validation, invalid credentials, expired token. Test role_required dependency blocks unauthorized access. Test folder assignment access control.",
+    "Create tests/test_rbac.py: Test admin can assign/remove roles. Test folder assignments grant correct access. Test permission checks on document endpoints."
+  ],
+  "acceptance_criteria": [
+    "POST /api/auth/register creates a user and returns user info",
+    "POST /api/auth/login returns a valid JWT token",
+    "GET /api/auth/me with valid token returns current user with roles",
+    "Admin user can assign roles (admin, reviewer, editor, annotator, approver) to users",
+    "Admin user can assign folder paths to users with specific roles",
+    "Document endpoints check folder access permissions",
+    "Protected endpoints return 401 without token and 403 without required role",
+    "Default admin user is created on first startup",
+    "All existing 82+ tests still pass (no regressions)",
+    "New auth/RBAC tests pass",
+    "Running 'uv run ruff check app/ tests/' passes"
+  ],
+  "verification": [
+    "uv sync",
+    "uv run pytest tests/ -v",
+    "uv run ruff check app/ tests/"
+  ],
+  "blocked_reason": null,
+  "findings": "bcrypt 5.x is incompatible with passlib; pinned bcrypt==4.0.1 to resolve. All 146 tests pass (131 existing + 15 new). Lint passes cleanly."
+}

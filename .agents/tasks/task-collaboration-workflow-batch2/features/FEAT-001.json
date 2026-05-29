@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Multi-stage approval chains, comments/discussion threads, @mentions, and document checkout/lock. This feature adds: (1) ApprovalChain/ApprovalStep models for sequential and parallel approval workflows, configurable per folder/template. (2) Comment model for per-document threaded discussions with markdown support. (3) @mention detection in comments creating notifications via existing WebSocket system. (4) DocumentLock model for checkout/lock with configurable expiry and admin force-unlock.",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Install new dependencies: Add 'qrcode[pil]' and 'cryptography' to pyproject.toml dependencies using uv add (needed for later features but install now to avoid issues). Run uv sync.",
+    "Step 2 - Create app/models/approval.py with: ApprovalChain (id int PK, name str, folder_id FK nullable to groups.id, template_id FK nullable to document_templates.id, is_active bool, created_at). ApprovalStep (id int PK, chain_id FK to approval_chains.id CASCADE, step_order int, approval_type enum 'sequential'/'parallel', role_code str nullable, user_id str FK nullable to users.id, timeout_hours int nullable, created_at). ApprovalRequest (id int PK, document_id FK to documents.id CASCADE, chain_id FK to approval_chains.id, status enum 'pending'/'approved'/'rejected', current_step_order int, submitted_by str FK to users.id, submitted_at datetime, completed_at datetime nullable). ApprovalDecision (id int PK, request_id FK to approval_requests.id CASCADE, step_id FK to approval_steps.id, user_id str FK to users.id, decision enum 'approved'/'rejected', comment text nullable, decided_at datetime).",
+    "Step 3 - Create app/models/comment.py with: Comment (id int PK, document_id FK to documents.id CASCADE, user_id str FK to users.id CASCADE, content text not null, parent_id int FK nullable to comments.id for threading, created_at datetime, updated_at datetime nullable).",
+    "Step 4 - Create app/models/document_lock.py with: DocumentLock (id int PK, document_id FK to documents.id CASCADE unique, user_id str FK to users.id CASCADE, locked_at datetime, expires_at datetime, reason str nullable).",
+    "Step 5 - Create app/schemas/approval.py with Pydantic schemas: ApprovalChainCreate (name, folder_id optional, template_id optional, steps list of ApprovalStepCreate). ApprovalStepCreate (step_order, approval_type, role_code optional, user_id optional, timeout_hours optional). ApprovalChainResponse, ApprovalStepResponse, ApprovalRequestCreate (document_id), ApprovalRequestResponse, ApprovalDecisionCreate (decision, comment optional), ApprovalDecisionResponse.",
+    "Step 6 - Create app/schemas/comment.py with: CommentCreate (content str, parent_id int optional), CommentUpdate (content str), CommentResponse (id, document_id, user_id, username str, content, parent_id, created_at, updated_at).",
+    "Step 7 - Create app/schemas/document_lock.py with: LockCreate (reason optional, duration_hours int default 24), LockResponse (id, document_id, user_id, username str, locked_at, expires_at, reason, is_expired bool), LockStatusResponse (is_locked bool, lock optional LockResponse).",
+    "Step 8 - Create app/api/approval_chains.py with endpoints: POST /api/approval-chains (create chain with steps, admin only), GET /api/approval-chains (list chains), GET /api/approval-chains/{id} (get chain detail with steps), DELETE /api/approval-chains/{id} (admin only). POST /api/documents/{document_id}/approval-requests (submit for approval - finds matching chain by folder/template, creates ApprovalRequest). POST /api/approval-requests/{id}/decide (approve or reject current step). GET /api/documents/{document_id}/approval-status (get current approval state). When all steps approved, mark request approved. If any step rejected, mark request rejected and notify submitter.",
+    "Step 9 - Create app/api/comments.py with endpoints: POST /api/documents/{document_id}/comments (create comment, auth required - parse @mentions from content and create notifications), GET /api/documents/{document_id}/comments (list comments for document, public), PUT /api/comments/{id} (update own comment), DELETE /api/comments/{id} (delete own comment or admin). Mention parsing: use regex r'@(\\w+)' to find usernames, resolve to user IDs, call notification_manager.create_notification for each mentioned user.",
+    "Step 10 - Create app/api/document_locks.py with endpoints: POST /api/documents/{document_id}/lock (checkout document, fails if already locked by another user and not expired), DELETE /api/documents/{document_id}/lock (unlock - own lock or admin force-unlock), GET /api/documents/{document_id}/lock (get lock status). Auto-expire: when checking lock status or attempting lock, check if expires_at < now and delete expired locks.",
+    "Step 11 - Register all new routers in app/api/router.py: import and include approval_chains router, comments router, document_locks router.",
+    "Step 12 - Create tests/test_approval_chains.py testing: create chain with steps, submit document for approval, approve steps sequentially, reject step (resets to rejected), parallel approval (any-of pattern), chain not found for document without matching folder/template.",
+    "Step 13 - Create tests/test_comments.py testing: create comment, list comments, reply (parent_id), update comment, delete comment, @mention creates notification, unauthenticated create fails.",
+    "Step 14 - Create tests/test_document_locks.py testing: lock document, lock status shows locked, unlock document, cannot lock already-locked document, admin force-unlock, expired lock allows re-lock.",
+    "Step 15 - Run uv run pytest tests/test_approval_chains.py tests/test_comments.py tests/test_document_locks.py -v to verify all new tests pass."
+  ],
+  "acceptance_criteria": [
+    "Running uv run pytest tests/test_approval_chains.py -v passes all approval chain tests",
+    "Running uv run pytest tests/test_comments.py -v passes all comment/mention tests",
+    "Running uv run pytest tests/test_document_locks.py -v passes all document lock tests",
+    "All 697+ existing tests continue to pass",
+    "@mention in a comment content triggers notification creation for the mentioned user",
+    "Document lock prevents other users from locking and returns lock info"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -q --tb=short"
+  ],
+  "blocked_reason": null,
+  "findings": "Used naive datetimes (datetime.utcnow()) instead of timezone-aware (datetime.now(timezone.utc)) for SQLite compatibility. Total test count went from 697 to 722 (25 new tests). All existing tests continue to pass."
+}

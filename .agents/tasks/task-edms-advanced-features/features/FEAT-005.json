@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Document Preview - Generate previews without downloading full encrypted files. PDF first-page thumbnail, Markdown HTML render, image thumbnails. Cached during pipeline processing.",
+  "status": "completed",
+  "steps": [
+    "Create app/services/preview.py with a PreviewService class: (a) generate_pdf_preview(file_path: Path) -> bytes - uses PyMuPDF (fitz) to render the first page of a PDF as a PNG image (thumbnail, max 800px width). Returns PNG bytes. (b) generate_markdown_preview(markdown_content: str) -> str - converts first 2000 chars of markdown to HTML (use a simple markdown-to-html approach or basic regex conversion since we don't want heavy dependencies). (c) generate_image_preview(file_path: Path) -> bytes - uses Pillow to create a thumbnail (max 400x400px). Returns PNG bytes. (d) get_preview_path(document_id: int) -> Path - returns path in data/previews/{document_id}_preview.png. (e) generate_and_cache(document_id, file_path, file_type, markdown_content=None) - generates appropriate preview based on file type and saves to cache path.",
+    "Update app/services/pipeline.py to call PreviewService.generate_and_cache() after successful document conversion. This generates the preview during processing so it's available immediately after.",
+    "Create app/api/preview.py with APIRouter (tags=['preview']): (a) GET /api/documents/{document_id}/preview - returns the cached preview. For PDFs/images: returns image/png response. For markdown: returns text/html response. If no preview is cached, returns 404 or attempts on-the-fly generation. (b) Query param ?type=thumbnail|html to force a specific output type. Requires authentication.",
+    "Create app/schemas/preview.py with PreviewMetadata response schema (document_id, preview_type, generated_at, file_size).",
+    "Register the preview router in app/api/router.py.",
+    "Integrate with audit trail: log 'view' when preview is accessed (using audit service from FEAT-003 if available, otherwise skip audit integration).",
+    "Create tests/test_preview.py with tests for: (a) PDF preview generates a valid PNG. (b) Markdown preview generates HTML. (c) Image preview generates a thumbnail. (d) GET /api/documents/{id}/preview returns cached preview. (e) Returns 404 when no preview exists for unprocessed document. (f) Preview does NOT expose full document content (only first page/summary)."
+  ],
+  "acceptance_criteria": [
+    "PDF documents get a first-page PNG thumbnail preview",
+    "Markdown documents get an HTML preview of first portion",
+    "Image documents get a resized thumbnail",
+    "Preview is generated during pipeline processing and cached on disk",
+    "GET /api/documents/{id}/preview returns the cached preview without decrypting full file",
+    "Preview does not expose full document content",
+    "All existing tests continue to pass",
+    "New tests in test_preview.py all pass"
+  ],
+  "verification": [
+    "uv run ruff check app/ tests/",
+    "uv run pytest tests/ -x -q"
+  ],
+  "blocked_reason": null,
+  "findings": "All 576 tests pass (19 new preview tests + 557 existing). Used data/previews/ as cache directory created automatically at runtime. Tests clean up leftover preview files to avoid cross-test pollution since data/ directory is not in tmp_path but in the project root. Auth in tests requires creating User with Role and generating JWT via create_access_token."
+}

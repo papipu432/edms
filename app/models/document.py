@@ -1,10 +1,18 @@
+from __future__ import annotations
+
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+
+
 from app.models.group import Base
+
+if TYPE_CHECKING:
+    from app.models.version import DocumentVersion
 
 
 class DocumentStatus(str, enum.Enum):
@@ -40,5 +48,15 @@ class Document(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    extracted_fields: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    template_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("document_templates.id", ondelete="SET NULL"), nullable=True
+    )
+    current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")
+    ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tenant_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=True
+    )
 
     group: Mapped["Group"] = relationship(back_populates="documents")  # noqa: F821
+    versions: Mapped[list["DocumentVersion"]] = relationship(back_populates="document")
