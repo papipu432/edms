@@ -152,7 +152,8 @@ Default admin credentials: `admin` / `admin` (change immediately in production).
 | [API_COOKBOOK.md](API_COOKBOOK.md) | Copy-pasteable curl examples for every endpoint |
 | [HOWTO.md](HOWTO.md) | Step-by-step guides for common tasks |
 | [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md) | Deployment, monitoring, backup, incident response |
-| [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) | **NEW** Production deployment checklist, security hardening, HA setup, monitoring, DR procedures |
+| [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) | Production deployment checklist, security hardening, HA setup, monitoring, DR procedures |
+| [PRODUCTION_ENHANCEMENTS.md](PRODUCTION_ENHANCEMENTS.md) | ✨ **NEW** Production enhancement roadmap with implementation guides |
 | [SECURITY.md](SECURITY.md) | Authentication, encryption, RBAC, threat model |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues with symptoms, causes, and solutions |
 | [USER_GUIDE.md](USER_GUIDE.md) | End-user guide for document management |
@@ -180,3 +181,15 @@ edms/
 ## License
 
 Enterprise proprietary software. All rights reserved.
+
+## Document Templates
+
+The EDMS includes a comprehensive document template system for generating standardized documents:
+
+- **12 Pre-built Templates**: ISO 27001 policies, OWASP checklists, SBOM, HR forms, incident reports
+- **Dual Format Support**: Generate both Word (.docx) and PDF documents
+- **API & UI Access**: Generate documents via REST API or web interface
+- **Compliance Ready**: Templates aligned with ISO 27001, OWASP, and industry standards
+
+See [Document Templates Guide](DOCUMENT_TEMPLATES.md) for complete documentation.
+

@@ -2,6 +2,8 @@ services:
   app:
     build: .
     env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
     depends_on:
       postgres:
         condition: service_healthy
@@ -13,23 +15,51 @@ services:
         condition: service_healthy
     networks:
       - internal
+    volumes:
+      - edms_storage:/app/storage
+      - edms_wiki:/app/wiki
+      - edms_data:/app/data
+      - edms_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:size=100M,mode=1777
 
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: edms
-      POSTGRES_PASSWORD: edms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edms_secure_password_change_me}
       POSTGRES_DB: edms
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edms"]
+      test: ["CMD-SHELL", "pg_isready -U edms -d edms"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
       - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   chromadb:
     image: chromadb/chroma:latest
@@ -37,8 +67,9 @@ services:
       - chroma_data:/chroma/chroma
     environment:
       - CHROMA_SERVER_AUTHN_PROVIDER=chromadb.auth.token.TokenAuthenticationServerProvider
-      - CHROMA_SERVER_AUTHN_CREDENTIALS=${CHROMA_AUTH_TOKEN:-changeme}
+      - CHROMA_SERVER_AUTHN_CREDENTIALS=${CHROMA_AUTH_TOKEN:-changeme_secure_token}
       - CHROMA_IS_PERSISTENT=TRUE
+      - CHROMA_DB_IMPL=duckdb+parquet
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -52,13 +83,20 @@ services:
       start_period: 10s
     networks:
       - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    restart: unless-stopped
 
   minio:
     image: minio/minio
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_secure_password_change_me}
+      MINIO_BROWSER_REDIRECT_URL: https://${EDMS_HOSTNAME:-localhost}/minio
     volumes:
       - minio_data:/data
     healthcheck:
@@ -69,9 +107,18 @@ services:
       start_period: 10s
     networks:
       - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
@@ -82,23 +129,53 @@ services:
       start_period: 5s
     networks:
       - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=50M,mode=1777
 
   celery-worker:
     build: .
-    command: celery -A app.tasks worker -l info
+    command: celery -A app.tasks worker -l info --concurrency=${CELERYD_CONCURRENCY:-4}
     env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     networks:
       - internal
+    volumes:
+      - edms_storage:/app/storage
+      - edms_wiki:/app/wiki
+      - edms_data:/app/data
+      - edms_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   celery-beat:
     build: .
     command: celery -A app.tasks beat -l info
     env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
     depends_on:
       redis:
         condition: service_healthy
@@ -106,30 +183,69 @@ services:
         condition: service_healthy
     networks:
       - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
     depends_on:
       - app
     networks:
       - internal
       - external
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=50M,mode=1777
+      - /var/cache/nginx:size=100M,mode=1777
+      - /var/run:size=50M,mode=1777
 
 networks:
   internal:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
   external:
     driver: bridge
 
 volumes:
   postgres_data:
+    driver: local
   minio_data:
+    driver: local
   chroma_data:
+    driver: local
   redis_data:
+    driver: local
+  edms_storage:
+    driver: local
+  edms_wiki:
+    driver: local
+  edms_data:
+    driver: local
+  edms_logs:
+    driver: local
+  nginx_logs:
+    driver: local

@@ -60,6 +60,7 @@ from app.api.tenants import router as tenants_router
 from app.api.offline import router as offline_router
 from app.api.import_export import router as import_export_router
 from app.api.webhooks import router as webhooks_router
+from app.api.document_templates import router as document_templates_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
@@ -122,3 +123,4 @@ api_router.include_router(tenants_router)
 api_router.include_router(offline_router)
 api_router.include_router(import_export_router)
 api_router.include_router(webhooks_router)
+api_router.include_router(document_templates_router)
